@@ -1,0 +1,42 @@
+.key TAG/A,PEER/A
+; File transfer test on AROS; driven by scripts/aros-sync-test.sh, which
+; changes big.bin on the peer after step 1 and waits for the "done" marker
+; connection of step 5. Results: RESULTS:sync-<tag>-* (new names per run).
+; The destination SYS:st-dest-<tag> is new for every run and deleted at the
+; end, after its files have been copied to RESULTS: for comparison.
+FailAt 1000
+; The default Shell stack on AROS One (40960 bytes on fresh pool copies)
+; is too small to rely on for OpenSSL.
+Stack 262144
+Protect RAM:stp/stpoc +rwed
+Version >RESULTS:sync-<TAG>-0-system.txt
+Version bsdsocket.library FULL >>RESULTS:sync-<TAG>-0-system.txt
+MakeDir SYS:st-dest-<TAG>
+; 1: the whole folder into an empty destination
+RAM:stp/stpoc RESULTS:sync-<TAG>-1-sync.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-poc-1 SYS:st-dest-<TAG> 300 0
+Echo "1-sync rc=$RC" >>RESULTS:sync-<TAG>-8-rc.txt
+List SYS:st-dest-<TAG> ALL >RESULTS:sync-<TAG>-1-list.txt
+Copy SYS:st-dest-<TAG>/hello.txt RESULTS:sync-<TAG>-1-hello.txt
+Copy SYS:st-dest-<TAG>/empty.txt RESULTS:sync-<TAG>-1-empty.txt
+Copy SYS:st-dest-<TAG>/sub/nested.txt RESULTS:sync-<TAG>-1-nested.txt
+Copy SYS:st-dest-<TAG>/big.bin RESULTS:sync-<TAG>-1-big.bin
+; the host replaces big.bin on the peer now
+Wait 30
+; 2: the new big.bin, interrupted like a crash after 6 blocks in total
+;    (hello 1, nested 1, then the 4th of big.bin's 9): the previous complete
+;    big.bin must be left as it was
+RAM:stp/stpoc RESULTS:sync-<TAG>-2-interrupted.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-poc-1 SYS:st-dest-<TAG> 300 0 6
+Echo "2-interrupted rc=$RC" >>RESULTS:sync-<TAG>-8-rc.txt
+List SYS:st-dest-<TAG> ALL >RESULTS:sync-<TAG>-2-list.txt
+Copy SYS:st-dest-<TAG>/big.bin RESULTS:sync-<TAG>-2-big.bin
+; 3: the same again without interruption: the new version replaces the old
+RAM:stp/stpoc RESULTS:sync-<TAG>-3-sync.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-poc-1 SYS:st-dest-<TAG> 300 0
+Echo "3-sync rc=$RC" >>RESULTS:sync-<TAG>-8-rc.txt
+List SYS:st-dest-<TAG> ALL >RESULTS:sync-<TAG>-3-list.txt
+Copy SYS:st-dest-<TAG>/big.bin RESULTS:sync-<TAG>-3-big.bin
+; 4: clean up the destination on SYS:
+Delete SYS:st-dest-<TAG> ALL QUIET FORCE
+Echo "4-cleanup rc=$RC" >>RESULTS:sync-<TAG>-8-rc.txt
+Echo "done" >RESULTS:sync-<TAG>-9-done.txt
+; 5: marker for the host: a short session whose device name says "done"
+RAM:stp/stpoc RESULTS:sync-<TAG>-9-marker.log run SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-poc-1 30 0 done-<TAG>

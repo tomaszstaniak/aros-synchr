@@ -1,0 +1,100 @@
+; Data protection on the target's own file system, driven by
+; scripts/aros-accept.sh (placeholders as in accept.scr). Folder dp-<TAG>
+; holds a.txt, b.txt and c.txt; the host changes all three on the peer
+; after the marker dpchg-<TAG>. The download of the new versions runs in
+; the background with stpoc's commit hook (RAM:stp/hook), so each case
+; acts at the exact moment before a file is replaced:
+;   A  a.txt is edited here while its new version waits for the commit
+;   B  b.txt is held open (holdopen) across its replacement and written
+;      through that handle afterwards
+;   C  an earlier copy .stpoc-c.txt.old with other content is present
+; A following normal run shows what stayed. Everything outside RAM: is
+; under <DEST>, created here and deleted by its exact name at the end.
+FailAt 1000
+Stack 262144
+Protect RAM:stp/stpoc +rwed
+Protect RAM:stp/holdopen +rwed
+If EXISTS <DEST>
+  Echo "<DEST> exists already; nothing done" >><OUT>/dp-0-refused.txt
+  Quit 10
+EndIf
+Info SYS: ><OUT>/dp-0-system.txt
+MakeDir <DEST> <DEST>/id <DEST>/d RAM:stp/hook
+Echo "[<TAG>]" ><DEST>/OWNER
+Copy RAM:stp/id/cert.pem RAM:stp/id/key.pem <DEST>/id QUIET
+
+; 1 version 1 of a, b, c
+RAM:stp/stpoc <OUT>/dp-1-first.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> dp-<TAG> <DEST>/d 600 0
+Echo "1-first rc=$RC" >><OUT>/dp-8-rc.txt
+; 2 the host changes a, b and c on the peer after this marker
+RAM:stp/stpoc <OUT>/dp-2-marker.log run <DEST>/id 10.0.2.2 <PORT> <PEER> dp-<TAG> 120 0 dpchg-<TAG>
+Wait 45
+; C: an earlier copy of c.txt that is not the recorded version
+Echo "copy kept on AROS" ><DEST>/d/.stpoc-c.txt.old
+; 3 the new versions, each commit waiting for the go-ahead
+Run >NIL: RAM:stp/stpoc <OUT>/dp-3-hooked.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> dp-<TAG> <DEST>/d 600 0 0 0 RAM:stp/hook
+; A and B, in whatever order the peer lists the files
+Set dpa 0
+Set dpb 0
+Lab hookloop
+If EXISTS RAM:stp/hook/at-a.txt
+  If $dpa EQ 0
+    ; A: a.txt is edited while its new version waits
+    Echo "edited on AROS during the download" ><DEST>/d/a.txt
+    Echo "go" >RAM:stp/hook/go-a.txt
+    Set dpa 1
+  EndIf
+EndIf
+If EXISTS RAM:stp/hook/at-b.txt
+  If $dpb EQ 0
+    ; B: holdopen opens b.txt, gives the go-ahead itself, writes 20 s later
+    Run >NIL: RAM:stp/holdopen <DEST>/d/b.txt RAM:stp/hook/go-b.txt 20 <OUT>/dp-3-holdopen.txt
+    Set dpb 1
+  EndIf
+EndIf
+If $dpa EQ 0
+  Wait 1
+  Skip hookloop BACK
+EndIf
+If $dpb EQ 0
+  Wait 1
+  Skip hookloop BACK
+EndIf
+; the hooked session ends, then holdopen's late write
+Lab waitr
+Search >NIL: <OUT>/dp-3-hooked.log "RESULT"
+If WARN
+  Wait 2
+  Skip waitr BACK
+EndIf
+Wait 30
+List <DEST>/d ALL ><OUT>/dp-3-list.txt
+Copy <DEST>/d/a.txt <OUT>/dp-3-a.txt
+Copy <DEST>/d/b.txt <OUT>/dp-3-b.txt
+Copy <DEST>/d/c.txt <OUT>/dp-3-c.txt
+If EXISTS <DEST>/d/.stpoc-b.txt.old
+  Copy <DEST>/d/.stpoc-b.txt.old <OUT>/dp-3-b-old.txt
+EndIf
+If EXISTS <DEST>/d/.stpoc-c.txt.old
+  Copy <DEST>/d/.stpoc-c.txt.old <OUT>/dp-3-c-old.txt
+EndIf
+; 4 a normal run afterwards
+RAM:stp/stpoc <OUT>/dp-4-next.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> dp-<TAG> <DEST>/d 600 0
+Echo "4-next rc=$RC" >><OUT>/dp-8-rc.txt
+List <DEST>/d ALL ><OUT>/dp-4-list.txt
+Copy <DEST>/d/b.txt <OUT>/dp-4-b.txt
+If EXISTS <DEST>/d/.stpoc-b.txt.old
+  Copy <DEST>/d/.stpoc-b.txt.old <OUT>/dp-4-b-old.txt
+EndIf
+
+Search >NIL: <DEST>/OWNER "[<TAG>]"
+If NOT WARN
+  Delete <DEST> ALL QUIET FORCE
+EndIf
+If EXISTS <DEST>
+  Echo "<DEST> NOT removed" >><OUT>/dp-9-cleanup.txt
+Else
+  Echo "<DEST> removed" >><OUT>/dp-9-cleanup.txt
+EndIf
+Echo "done" ><OUT>/dp-9-done.txt
+RAM:stp/stpoc <OUT>/dp-9-marker.log run RAM:stp/id 10.0.2.2 <PORT> <PEER> dp-<TAG> 60 0 done-dp-<TAG>

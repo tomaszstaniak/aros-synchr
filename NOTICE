@@ -1,0 +1,18 @@
+aros-syncthing is distributed under the MIT License (LICENSE), with these
+exceptions:
+
+- src/vv.c and tests/compat/oracle.go are derived from Syncthing
+  (lib/protocol/vector.go, Copyright (C) 2015 The Syncthing Authors) and
+  are covered by the Mozilla Public License 2.0, as marked in each file:
+  https://mozilla.org/MPL/2.0/
+- config/jitterentropy/ keeps its own MIT notice.
+
+Built AROS programs link statically:
+
+- OpenSSL 4.0.1, Apache License 2.0 (https://www.openssl.org/source/license.html);
+  patches applied are in patches/openssl-4.0.1/.
+- jitterentropy 3.7.0, used under the BSD-3-Clause option of its dual
+  licence (BSD-3-Clause or GPL-2.0).
+
+aros-syncthing is an independent implementation of the Block Exchange
+Protocol. It is not affiliated with or endorsed by the Syncthing project.

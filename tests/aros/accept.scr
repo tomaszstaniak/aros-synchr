@@ -1,0 +1,99 @@
+; Acceptance of stpoc on one AROS target, driven by scripts/aros-accept.sh,
+; which fills in <TAG>, <PEER>, <WRONG>, <PORT>, <OUT> (the run's results
+; directory) and <DEST> (a new directory on SYS:, the target's own file
+; system) and stages this script with stpoc, tlsprobe, the test identity
+; (id/) and the files of the first index batch of folder multi-<TAG> (pre/).
+;
+; The guest signals the host by connecting with a marker device name
+; (chg1-<TAG>, done-<TAG>); the host changes hello.txt on the peer after
+; chg1. Everything written outside RAM: is under <DEST>, which this script
+; creates, marks with its OWNER file and deletes by its exact name at the
+; end. Run it once per boot; a second run stops at the OWNER check.
+FailAt 1000
+; OpenSSL needs more than the default Shell stack of fresh installations.
+Stack 262144
+Protect RAM:stp/stpoc +rwed
+Protect RAM:stp/tlsprobe +rwed
+If EXISTS <DEST>
+  Echo "<DEST> exists already; nothing done" >><OUT>/0-refused.txt
+  Quit 10
+EndIf
+Version ><OUT>/0-system.txt
+Version exec.library FULL >><OUT>/0-system.txt
+Version dos.library FULL >><OUT>/0-system.txt
+Version bsdsocket.library FULL >><OUT>/0-system.txt
+Date >><OUT>/0-system.txt
+Info SYS: >><OUT>/0-system.txt
+MakeDir <DEST> <DEST>/id <DEST>/acc <DEST>/multi <DEST>/empty
+Echo "[<TAG>]" ><DEST>/OWNER
+Copy RAM:stp/id/cert.pem RAM:stp/id/key.pem <DEST>/id QUIET
+
+; 1 RNG: without selecting JITTER there is no seed source at all
+RAM:stp/tlsprobe <OUT>/1-nojitter.log no-jitter-select
+Echo "1-nojitter rc=$RC" >><OUT>/8-rc.txt
+; 2 jitterentropy initialisation made to fail: no key is written
+MakeDir RAM:stp/failid
+RAM:stp/tlsprobe <OUT>/2-failinit.log fail-jitter-init RAM:stp/failid
+Echo "2-failinit rc=$RC" >><OUT>/8-rc.txt
+List RAM:stp/failid >><OUT>/2-failinit-dir.txt
+; 3 a new identity from this system's RNG
+MakeDir RAM:stp/newid
+RAM:stp/tlsprobe <OUT>/3-newid.log create RAM:stp/newid
+Echo "3-newid rc=$RC" >><OUT>/8-rc.txt
+; 4 TLS 1.3 with the expected Device ID, then with a wrong one
+RAM:stp/tlsprobe <OUT>/4-tls-ok.log connect <DEST>/id 10.0.2.2 <PORT> <PEER> 120
+Echo "4-tls-ok rc=$RC" >><OUT>/8-rc.txt
+RAM:stp/tlsprobe <OUT>/4-tls-wrong.log connect <DEST>/id 10.0.2.2 <PORT> <WRONG> 120
+Echo "4-tls-wrong rc=$RC" >><OUT>/8-rc.txt
+
+; 5 first download of acc-<TAG> onto SYS:
+RAM:stp/stpoc <OUT>/5-first.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> acc-<TAG> <DEST>/acc 600 0
+Echo "5-first rc=$RC" >><OUT>/8-rc.txt
+; 6 restart: nothing to request
+RAM:stp/stpoc <OUT>/6-restart.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> acc-<TAG> <DEST>/acc 600 0
+Echo "6-restart rc=$RC" >><OUT>/8-rc.txt
+; 7 the host changes hello.txt on the peer after this marker
+RAM:stp/stpoc <OUT>/7-marker.log run <DEST>/id 10.0.2.2 <PORT> <PEER> acc-<TAG> 120 0 chg1-<TAG>
+Wait 45
+; 8 only hello.txt is requested; it replaces the recorded version
+RAM:stp/stpoc <OUT>/8-change.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> acc-<TAG> <DEST>/acc 600 0
+Echo "8-change rc=$RC" >><OUT>/8-rc.txt
+; 9 a file changed here is kept and reported, not overwritten
+Echo "changed here on AROS" ><DEST>/acc/sub/nested.txt
+RAM:stp/stpoc <OUT>/9-conflict.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> acc-<TAG> <DEST>/acc 600 0
+Echo "9-conflict rc=$RC" >><OUT>/8-rc.txt
+Copy <DEST>/acc/sub/nested.txt <OUT>/9-nested-after.txt
+; 10 the conflict is resolved by deleting the local copy, and a
+;    replacement interrupted between its two renames (the previous
+;    version still moved aside) is put back without a download
+Delete <DEST>/acc/sub/nested.txt
+Rename <DEST>/acc/Data/Blob.bin <DEST>/acc/Data/.stpoc-Blob.bin.old
+RAM:stp/stpoc <OUT>/10-recover.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> acc-<TAG> <DEST>/acc 600 0
+Echo "10-recover rc=$RC" >><OUT>/8-rc.txt
+; 11 an index in two batches: the first one is all here already. The
+;    limit is generous: on the Pi's FAT32 the 1000 adoptions alone take
+;    10-15 minutes (2026-11-09); this step checks completeness, not speed.
+Copy RAM:stp/pre/#? <DEST>/multi QUIET
+RAM:stp/stpoc <OUT>/11-multi.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> multi-<TAG> <DEST>/multi 1800 0
+Echo "11-multi rc=$RC" >><OUT>/8-rc.txt
+; 12 an empty folder: the peer sends no Index at all
+RAM:stp/stpoc <OUT>/12-empty.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> empty-<TAG> <DEST>/empty 120 0
+Echo "12-empty rc=$RC" >><OUT>/8-rc.txt
+
+; results for comparison on the host
+Copy <DEST>/acc <OUT>/acc ALL QUIET
+Copy <DEST>/multi/n#? <OUT>/multi-new QUIET
+List <DEST>/multi FILES LFORMAT "%N %L" >><OUT>/11-multi-list.txt
+List <DEST>/acc ALL >><OUT>/10-acc-list.txt
+; clean up: only the directory this run created, by its exact name
+Search >NIL: <DEST>/OWNER "[<TAG>]"
+If NOT WARN
+  Delete <DEST> ALL QUIET FORCE
+EndIf
+If EXISTS <DEST>
+  Echo "<DEST> NOT removed" >><OUT>/9-cleanup.txt
+Else
+  Echo "<DEST> removed" >><OUT>/9-cleanup.txt
+EndIf
+Echo "done" ><OUT>/9-done.txt
+RAM:stp/stpoc <OUT>/9-marker.log run RAM:stp/id 10.0.2.2 <PORT> <PEER> empty-<TAG> 60 0 done-<TAG>

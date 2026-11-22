@@ -1,0 +1,49 @@
+Subject: Allow a build to use OpenSSL's own getaddrinfo fallback
+
+What fails: the AROS headers define AI_PASSIVE and struct addrinfo, so
+crypto/bio/bio_local.h and bio_addr.c select the getaddrinfo() path, and
+the link fails with getaddrinfo, getnameinfo, freeaddrinfo and
+gai_strerror undefined.
+
+Why: on AROS these functions exist but are not plain C symbols. AROSTCP
+provides them in miami.library (ABIv11 SDK clib/miami_protos.h, LVO
+40-45) and, on mainline, also as Roadshow-style calls in bsdsocket.library;
+they are reached through a library base (MiamiBase) with the macros from
+<proto/miami.h>, which OpenSSL does not include or open. This build does
+not integrate that interface. The API is not missing.
+
+Fix: a build-defined macro, AROS_ST_NO_GETADDRINFO, undefines AI_PASSIVE
+in bio_local.h, which OpenSSL already uses as its switch to its own
+fallback (gethostbyname-based, IPv4 only). Only the aros-syncthing
+Configure target defines the macro; other AROS builds are unaffected.
+
+Scope: aros-syncthing's OpenSSL build only. aros-syncthing connects to a
+numeric address on a socket it opens itself and does not resolve names
+through OpenSSL, so the fallback is linked but not used.
+
+Verification: link of a TLS client probe for ABIv11 has no undefined
+symbols with this patch and four without it.
+
+Status: local limitation of this build, not an upstream candidate. A
+proper AROS integration would map these calls to MiamiBase and would need
+runtime tests of the resolver, including IPv6.
+---
+--- a/crypto/bio/bio_local.h
++++ b/crypto/bio/bio_local.h
+@@ -34,6 +34,16 @@
+ #error openssl/bio.h included before bio_local.h
+ #endif
+ 
++/*
++ * AROS_ST_NO_GETADDRINFO: the C library declares struct addrinfo and
++ * AI_PASSIVE, but getaddrinfo() and friends are not plain C functions
++ * there (on AROS they are calls through a library base, MiamiBase), so
++ * the build cannot link them. Use OpenSSL's own fallback instead.
++ */
++#ifdef AROS_ST_NO_GETADDRINFO
++#undef AI_PASSIVE
++#endif
++
+ #ifdef AI_PASSIVE
+ 
+ /*

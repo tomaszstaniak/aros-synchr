@@ -1,0 +1,25 @@
+; Directory lookup cost on the target's file systems, without stpoc
+; (tests/aros/dirbench.c). Directories of 100, 300 and 1000 files on SYS:
+; and, as a control, in RAM:. dirbench creates <DEST>/dbN itself and
+; deletes every file it made by exact name. Results: <OUT>/db-*.txt.
+FailAt 1000
+Stack 65536
+Protect RAM:stp/dirbench +rwed
+Info SYS: ><OUT>/db-0-system.txt
+If EXISTS <DEST>
+  Echo "<DEST> exists already; nothing done" >><OUT>/db-0-refused.txt
+  Quit 10
+EndIf
+MakeDir <DEST> RAM:stp/dbram
+RAM:stp/dirbench <DEST> 100 20 ><OUT>/db-1-sys-100.txt
+RAM:stp/dirbench <DEST> 300 20 ><OUT>/db-2-sys-300.txt
+RAM:stp/dirbench <DEST> 1000 20 ><OUT>/db-3-sys-1000.txt
+RAM:stp/dirbench RAM:stp/dbram 100 20 ><OUT>/db-4-ram-100.txt
+RAM:stp/dirbench RAM:stp/dbram 1000 20 ><OUT>/db-5-ram-1000.txt
+Delete <DEST> QUIET
+Delete RAM:stp/dbram QUIET
+If EXISTS <DEST>
+  Echo "<DEST> NOT removed" >><OUT>/db-9-cleanup.txt
+Else
+  Echo "<DEST> removed" >><OUT>/db-9-cleanup.txt
+EndIf

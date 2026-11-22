@@ -1,0 +1,488 @@
+From 5e6134e19016fc985f3ccee2da6501d2587d88a7 Mon Sep 17 00:00:00 2001
+From: tomaszstaniak <68373859+tomaszstaniak@users.noreply.github.com>
+Date: Tue, 10 Nov 2026 17:46:57 +0100
+Subject: [PATCH 2/2] fat: compare the write date with the cached entry, not a
+ copy in the lock
+
+Review of the previous commit: the date it last stored was kept at the
+end of struct ExtFileLock. A lock adopted from another handler instance
+in DoDiskInsert() is that instance's allocation; with an older binary,
+writing the new fields went past its end.
+
+OpWrite() now reads the file's entry after each write (it is in a cached
+sector) and rewrites it when the size grew, the archive bit is missing
+or the entry's write date is not the current FAT date. That still costs
+at most one extra entry update per two seconds, a write after
+SetFileDate() still updates the date, and a close without a write keeps
+it. The fields in struct ExtFileLock and the loop in OpSetDate() are
+gone; no handler structure changes.
+
+OpWrite() set ATTR_ARCHIVE in the entry without updating gl->attr, so a
+file without the archive bit had its entry rewritten on every write; the
+global lock now follows the entry in OpWrite(), the ACTION_FINDOUTPUT
+truncation and OpSetFileSize().
+
+fatwritedate: the last step locks a file under one handler (FIRST
+<path>, default the system's one), stops the volume and mounts it with
+the HANDLER one, which adopts the lock. Examine() through the adopted
+lock, SetFileDate() while it is held and UnLock() must work, and a later
+write must date the file.
+---
+ .../debug/test/filesys/fat/fatwritedate.c     | 125 +++++++++++++++---
+ rom/filesys/fat/fat_fs.h                      |   7 -
+ rom/filesys/fat/lock.c                        |   2 -
+ rom/filesys/fat/ops.c                         | 103 +++++----------
+ 4 files changed, 146 insertions(+), 91 deletions(-)
+
+diff --git a/developer/debug/test/filesys/fat/fatwritedate.c b/developer/debug/test/filesys/fat/fatwritedate.c
+index 458c8557..54f92bd4 100644
+--- a/developer/debug/test/filesys/fat/fatwritedate.c
++++ b/developer/debug/test/filesys/fat/fatwritedate.c
+@@ -16,18 +16,24 @@
+           current. The volume is then stopped and mounted again and the
+           dates are checked once more against what was written (a handler
+           that does not write its cache when inhibited, as before #2132,
+-          loses the files there and fails this part). At the end
++          loses the files there and fails this part). Last, a file is locked
++          under the FIRST handler, the volume is stopped and mounted with the
++          HANDLER one, which adopts the lock from the other instance
++          (DoDiskInsert()). Examine() through the adopted lock, SetFileDate()
++          on the file while it is held and UnLock() must work, and a later
++          write must date the file. At the end
+           the volume is dismounted and its files are deleted, so the test
+           can be run again.
+ 
+           Needs fdsk.device and about 41 MB of free memory (the image is
+           kept in RAM:).
+ 
+-    Usage: fatwritedate [HANDLER <path>]
++    Usage: fatwritedate [HANDLER <path>] [FIRST <path>]
+ 
+           HANDLER mounts the image with that handler file instead of the
+           system's FAT handler, to check a newly built one without
+-          installing it.
++          installing it. FIRST is the handler file that creates the lock
++          the HANDLER instance adopts (default: the system's FAT handler).
+ */
+ 
+ #include <dos/dos.h>
+@@ -179,9 +185,9 @@ static LONG run(CONST_STRPTR command)
+     return SystemTags(command, SYS_Output, BNULL, TAG_END);
+ }
+ 
+-static BOOL mount(void)
++static BOOL mount(CONST_STRPTR handler)
+ {
+-    return run("Mount " VOLUME " FROM " MOUNTLIST) == 0 && exists(VOLUME);
++    return write_mountlist(handler) && run("Mount " VOLUME " FROM " MOUNTLIST) == 0 && exists(VOLUME);
+ }
+ 
+ /*
+@@ -377,14 +383,102 @@ static LONG check(LONG i, CONST_STRPTR when)
+     return 0;
+ }
+ 
+-static int test(CONST_STRPTR handler);
++#define ADOPTED VOLUME "adopted"
++
++/* Locks ADOPTED under the first handler, stops it and mounts the volume with
++   the second, which adopts the lock (DoDiskInsert), uses the lock, sets the
++   file's date while it is held, releases it and writes the file. 0 or the
++   number of failures */
++static LONG adopted(CONST_STRPTR first, CONST_STRPTR handler)
++{
++    struct FileInfoBlock *fib;
++    BPTR lock, fh;
++    LONG t0, t1, d, fails = 0;
++    BOOL ok;
++
++    if (!mount(first))
++    {
++        printf("FAIL: adopted lock: cannot mount " VOLUME " with the first handler\n");
++        return 1;
++    }
++    if (!put(ADOPTED, "ABCDEFGHIJKLMNOP") || !(lock = Lock(ADOPTED, SHARED_LOCK)))
++    {
++        printf("FAIL: adopted lock: cannot prepare " ADOPTED ": error %ld\n", (long)IoErr());
++        unmount();
++        return 1;
++    }
++    unmount();
++    if (!mount(handler))
++    {
++        /* The lock belongs to a stopped handler: it cannot be released */
++        printf("FAIL: adopted lock: cannot mount " VOLUME " with the second handler\n");
++        return 1;
++    }
++
++    fib = AllocDosObject(DOS_FIB, NULL);
++    if (!fib || !Examine(lock, fib) || strcmp((char *)fib->fib_FileName, "adopted") != 0)
++    {
++        printf("FAIL: adopted lock: Examine() through it failed: error %ld\n", (long)IoErr());
++        fails++;
++    }
++    if (fib)
++        FreeDosObject(DOS_FIB, fib);
++    if (!set_old_date(ADOPTED))
++    {
++        printf("FAIL: adopted lock: SetFileDate() while it is held failed: error %ld\n", (long)IoErr());
++        fails++;
++    }
++    else
++    {
++        d = file_date(ADOPTED);
++        if (d < old_date - SLACK || d > old_date + SLACK)
++        {
++            printf("FAIL: adopted lock: the date set while it is held is %ld s off\n", (long)(d - old_date));
++            fails++;
++        }
++    }
++    UnLock(lock);
++
++    t0 = now();
++    ok = (fh = Open(ADOPTED, MODE_READWRITE)) != BNULL;
++    if (ok)
++    {
++        ok = write_at(fh, 0, OFFSET_BEGINNING, "abcd");
++        if (!Close(fh))
++            ok = FALSE;
++    }
++    t1 = now();
++    if (!ok)
++    {
++        printf("FAIL: adopted lock: writing the file after releasing it failed: error %ld\n", (long)IoErr());
++        unmount();
++        return fails + 1;
++    }
++    d = file_date(ADOPTED);
++    unmount();
++    if (d >= old_date - SLACK && d <= old_date + SLACK)
++    {
++        printf("FAIL: written after an adopted lock: date not updated, still the one set %ld days before\n",
++            (long)OLD_DAYS);
++        fails++;
++    }
++    else if (d < t0 - SLACK || d > t1 + SLACK)
++    {
++        printf("FAIL: written after an adopted lock: date %ld s from the time of the change\n",
++            (long)(d < t0 ? d - t0 : d - t1));
++        fails++;
++    }
++    return fails;
++}
++
++static int test(CONST_STRPTR handler, CONST_STRPTR first);
+ 
+ int main(void)
+ {
+     struct Process *me = (struct Process *)FindTask(NULL);
+     APTR window = me->pr_WindowPtr;
+-    IPTR args[1] = { 0 };
+-    struct RDArgs *rda = ReadArgs("HANDLER/K", args, NULL);
++    IPTR args[2] = { 0, 0 };
++    struct RDArgs *rda = ReadArgs("HANDLER/K,FIRST/K", args, NULL);
+     int rc;
+ 
+     if (!rda)
+@@ -394,13 +488,13 @@ int main(void)
+     }
+     /* No "insert volume" requesters while probing for the volume */
+     me->pr_WindowPtr = (APTR)-1;
+-    rc = test((CONST_STRPTR)args[0]);
++    rc = test((CONST_STRPTR)args[0], (CONST_STRPTR)args[1]);
+     me->pr_WindowPtr = window;
+     FreeArgs(rda);
+     return rc;
+ }
+ 
+-static int test(CONST_STRPTR handler)
++static int test(CONST_STRPTR handler, CONST_STRPTR first)
+ {
+     LONG fails = 0, i;
+     BPTR lock;
+@@ -413,18 +507,18 @@ static int test(CONST_STRPTR handler)
+     lock = CreateDir(DIR);
+     if (lock)
+         UnLock(lock);
+-    if (handler && !exists(handler))
++    if ((handler && !exists(handler)) || (first && !exists(first)))
+     {
+-        printf("FAIL: handler %s not found\n", handler);
++        printf("FAIL: handler %s not found\n", handler && !exists(handler) ? handler : first);
+         return RETURN_FAIL;
+     }
+-    if (!write_image() || !write_mountlist(handler))
++    if (!write_image())
+     {
+         printf("FAIL: cannot write the image to " DIR " (needs about 41 MB)\n");
+         run("Delete " DIR " ALL QUIET");
+         return RETURN_FAIL;
+     }
+-    if (run("Assign FDSK: " DIR) != 0 || !mount())
++    if (run("Assign FDSK: " DIR) != 0 || !mount(handler))
+     {
+         printf("FAIL: cannot mount " VOLUME " through fdsk.device\n");
+         run("Assign FDSK: REMOVE");
+@@ -456,7 +550,7 @@ static int test(CONST_STRPTR handler)
+     /* The same against what was written: stop the handler, which must write
+        its cache first, and mount again */
+     unmount();
+-    if (!mount())
++    if (!mount(handler))
+     {
+         printf("FAIL: cannot mount " VOLUME " again\n");
+         fails++;
+@@ -467,6 +561,7 @@ static int test(CONST_STRPTR handler)
+             if (done[i])
+                 fails += check(i, "after mounting again");
+         unmount();
++        fails += adopted(first, handler);
+     }
+ 
+     run("Assign FDSK: REMOVE");
+diff --git a/rom/filesys/fat/fat_fs.h b/rom/filesys/fat/fat_fs.h
+index 6321279a..d8eef0ef 100644
+--- a/rom/filesys/fat/fat_fs.h
++++ b/rom/filesys/fat/fat_fs.h
+@@ -122,13 +122,6 @@ struct ExtFileLock
+ 
+     BOOL                do_notify;      /* if set, send notification on file close (ACTION_END) */
+     struct FSSuper      *sb;            /* pointer to sb, for unlocking when volume is removed */
+-
+-    /* Kept last: a handler adopting a volume from another handler instance
+-       patches the fields above in that instance's locks */
+-    BOOL                date_set;       /* write_date/write_time below were stored
+-                                           by a change made through this lock */
+-    UWORD               write_date;     /* that modification date (FAT format) */
+-    UWORD               write_time;
+ };
+ 
+ struct GlobalLock
+diff --git a/rom/filesys/fat/lock.c b/rom/filesys/fat/lock.c
+index a675f699..731a9b96 100644
+--- a/rom/filesys/fat/lock.c
++++ b/rom/filesys/fat/lock.c
+@@ -293,7 +293,6 @@ LONG LockFile(ULONG dir_cluster, ULONG dir_entry, LONG access,
+     fl->pos = 0;
+ 
+     fl->do_notify = FALSE;
+-    fl->date_set = FALSE;
+ 
+     fl->gl = gl;
+     fl->sb = glob->sb;
+@@ -339,7 +338,6 @@ LONG LockRoot(LONG access, struct ExtFileLock **lock, struct Globals *glob)
+     fl->pos = 0;
+ 
+     fl->do_notify = FALSE;
+-    fl->date_set = FALSE;
+ 
+     if (IsListEmpty(&glob->sb->info->root_lock.locks))
+         ADDTAIL(&glob->sb->info->locks, &glob->sb->info->root_lock);
+diff --git a/rom/filesys/fat/ops.c b/rom/filesys/fat/ops.c
+index c887333f..388d6e2b 100644
+--- a/rom/filesys/fat/ops.c
++++ b/rom/filesys/fat/ops.c
+@@ -120,10 +120,7 @@ static LONG MoveToSubdir(struct DirHandle *dh, UBYTE **pname,
+ }
+ 
+ /* Changing a file's contents or length sets its modification date to the
+- * current time, as other AROS filesystems do. The dir entry is rewritten
+- * for this only when the date in FAT's two-second resolution differs from
+- * the one last stored through the same lock, so a run of writes costs at
+- * most one entry update per two seconds. */
++ * current time, in FAT's two-second resolution. */
+ static void CurrentWriteDate(UWORD *wdate, UWORD *wtime, struct Globals *glob)
+ {
+     struct DateStamp ds;
+@@ -132,34 +129,13 @@ static void CurrentWriteDate(UWORD *wdate, UWORD *wtime, struct Globals *glob)
+     ConvertDOSDate(&ds, wdate, wtime, glob);
+ }
+ 
+-static void SetWriteDate(struct DirEntry *de, struct Globals *glob)
++static void SetWriteDate(struct DirEntry *de, UWORD wdate, UWORD wtime)
+ {
+-    UWORD wdate, wtime;
+-
+-    CurrentWriteDate(&wdate, &wtime, glob);
+     de->e.entry.write_date = wdate;
+     de->e.entry.write_time = wtime;
+     de->e.entry.last_access_date = wdate;
+ }
+ 
+-/* Called once the entry filled by SetWriteDate has been written */
+-static void NoteWriteDate(struct ExtFileLock *lock, struct DirEntry *de)
+-{
+-    lock->write_date = de->e.entry.write_date;
+-    lock->write_time = de->e.entry.write_time;
+-    lock->date_set = TRUE;
+-}
+-
+-static BOOL WriteDateOutdated(struct ExtFileLock *lock, struct Globals *glob)
+-{
+-    UWORD wdate, wtime;
+-
+-    if (!lock->date_set)
+-        return TRUE;
+-    CurrentWriteDate(&wdate, &wtime, glob);
+-    return wdate != lock->write_date || wtime != lock->write_time;
+-}
+-
+ LONG OpLockFile(struct ExtFileLock *dirlock, UBYTE *name, ULONG namelen,
+     LONG access, struct ExtFileLock **filelock, struct Globals *glob)
+ {
+@@ -267,6 +243,7 @@ LONG OpOpenFile(struct ExtFileLock *dirlock, UBYTE *name, ULONG namelen,
+     struct ExtFileLock *lock;
+     struct DirHandle dh;
+     struct DirEntry de;
++    UWORD wdate, wtime;
+ 
+     D(
+         bug("[fat] opening file '");
+@@ -355,7 +332,8 @@ LONG OpOpenFile(struct ExtFileLock *dirlock, UBYTE *name, ULONG namelen,
+         de.e.entry.first_cluster_lo = de.e.entry.first_cluster_hi = 0;
+         de.e.entry.file_size = 0;
+         de.e.entry.attr |= ATTR_ARCHIVE;
+-        SetWriteDate(&de, glob);
++        CurrentWriteDate(&wdate, &wtime, glob);
++        SetWriteDate(&de, wdate, wtime);
+         err = UpdateDirEntry(&de, glob);
+         ReleaseDirHandle(&dh, glob);
+         if (err != 0)
+@@ -363,7 +341,7 @@ LONG OpOpenFile(struct ExtFileLock *dirlock, UBYTE *name, ULONG namelen,
+             FreeLock(lock, glob);
+             return err;
+         }
+-        NoteWriteDate(lock, &de);
++        lock->gl->attr |= ATTR_ARCHIVE;
+ 
+         D(bug("[fat] set first cluster and size to 0 in directory entry\n"));
+ 
+@@ -1049,6 +1027,7 @@ LONG OpWrite(struct ExtFileLock *lock, UBYTE *data, ULONG want,
+     BOOL update_entry = FALSE;
+     struct DirHandle dh;
+     struct DirEntry de;
++    UWORD wdate, wtime;
+ 
+     D(bug("[fat] request to write %ld bytes to file pos %ld\n", want,
+         lock->pos));
+@@ -1106,34 +1085,32 @@ LONG OpWrite(struct ExtFileLock *lock, UBYTE *data, ULONG want,
+             update_entry = TRUE;
+         }
+ 
+-        /* Force an update if the file hasn't already got an archive bit. This
+-         * will happen if this was the first write to an existing file that
+-         * didn't cause it to grow */
+-        else if (!(lock->gl->attr & ATTR_ARCHIVE))
+-            update_entry = TRUE;
+-
+-        /* Or if the stored modification date is no longer current */
+-        else if (WriteDateOutdated(lock, glob))
+-            update_entry = TRUE;
+-
+         D(bug("[fat] wrote %ld bytes, new file pos is %ld, size is %ld\n",
+             *written, lock->pos, size));
+ 
++        /* The entry is also rewritten when it lacks the archive bit or its
++         * modification date is no longer the current one. It is in a cached
++         * sector, and the date changes at most every two seconds, so a run of
++         * writes costs at most one extra entry update per two seconds */
++        InitDirHandle(lock->ioh.sb, lock->gl->dir_cluster, &dh, FALSE, glob);
++        err = GetDirEntry(&dh, lock->gl->dir_entry, &de, glob);
++        if (err != 0)
++        {
++            ReleaseDirHandle(&dh, glob);
++            return err;
++        }
++        CurrentWriteDate(&wdate, &wtime, glob);
++        if (!(de.e.entry.attr & ATTR_ARCHIVE)
++            || de.e.entry.write_date != wdate
++            || de.e.entry.write_time != wtime)
++            update_entry = TRUE;
++
+         if (update_entry)
+         {
+             D(bug("[fat] updating dir entry, first cluster is %ld,"
+                 " size is %ld\n",
+                 lock->ioh.first_cluster, size));
+ 
+-            InitDirHandle(lock->ioh.sb, lock->gl->dir_cluster, &dh,
+-                FALSE, glob);
+-            err = GetDirEntry(&dh, lock->gl->dir_entry, &de, glob);
+-            if (err != 0)
+-            {
+-                ReleaseDirHandle(&dh, glob);
+-                return err;
+-            }
+-
+             de.e.entry.file_size = AROS_LONG2LE(size);
+             de.e.entry.first_cluster_lo =
+                 AROS_WORD2LE(lock->ioh.first_cluster & 0xffff);
+@@ -1141,14 +1118,16 @@ LONG OpWrite(struct ExtFileLock *lock, UBYTE *data, ULONG want,
+                 AROS_WORD2LE(lock->ioh.first_cluster >> 16);
+ 
+             de.e.entry.attr |= ATTR_ARCHIVE;
+-            SetWriteDate(&de, glob);
++            SetWriteDate(&de, wdate, wtime);
+             err = UpdateDirEntry(&de, glob);
+-
+-            ReleaseDirHandle(&dh, glob);
+-            if (err != 0)
+-                return err;
+-            NoteWriteDate(lock, &de);
++        }
++        ReleaseDirHandle(&dh, glob);
++        if (err != 0)
++            return err;
++        if (update_entry)
++        {
+             lock->gl->first_cluster = lock->ioh.first_cluster;
++            lock->gl->attr |= ATTR_ARCHIVE;
+         }
+         lock->gl->size = size;
+     }
+@@ -1164,6 +1143,7 @@ LONG OpSetFileSize(struct ExtFileLock *lock, LONG offset, LONG whence,
+     struct DirEntry de;
+     QUAD size;
+     LONG err;
++    UWORD wdate, wtime;
+     ULONG first, cl, next, count = 0, want, keep = 0, tail = 0;
+     ULONG keep_next = 0;
+     ULONG added = 0, added_last = 0, last = 0, original_next = 0;
+@@ -1277,11 +1257,12 @@ LONG OpSetFileSize(struct ExtFileLock *lock, LONG offset, LONG whence,
+     de.e.entry.first_cluster_hi = AROS_WORD2LE(first >> 16);
+     de.e.entry.file_size = AROS_LONG2LE((ULONG)size);
+     de.e.entry.attr |= ATTR_ARCHIVE;
+-    SetWriteDate(&de, glob);
++    CurrentWriteDate(&wdate, &wtime, glob);
++    SetWriteDate(&de, wdate, wtime);
+     err = UpdateDirEntry(&de, glob);
+     if (err != 0)
+         goto rollback;
+-    NoteWriteDate(lock, &de);
++    lock->gl->attr |= ATTR_ARCHIVE;
+ 
+     lock->gl->size = size;
+     lock->gl->first_cluster = lock->ioh.first_cluster = first ? first : 0xffffffff;
+@@ -1423,19 +1404,7 @@ LONG OpSetDate(struct ExtFileLock *dirlock, UBYTE *name, ULONG namelen,
+     de.e.entry.last_access_date = wdate;
+     err = UpdateDirEntry(&de, glob);
+     if (err == 0)
+-    {
+-        struct GlobalLock *gl;
+-        struct MinNode *node;
+-
+-        /* A date set explicitly stays until the file's contents change
+-         * again: the next write to an open file must store its own date */
+-        ForeachNode(&glob->sb->info->locks, gl)
+-            if (gl->dir_cluster == de.cluster && gl->dir_entry == de.index)
+-                ForeachNode(&gl->locks, node)
+-                    LOCKFROMNODE(node)->date_set = FALSE;
+-
+         SendNotifyByDirEntry(glob->sb, &de);
+-    }
+ 
+     ReleaseDirHandle(&dh, glob);
+ 
+-- 
+2.54.0 (Apple Git-157)
+

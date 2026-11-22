@@ -1,0 +1,41 @@
+Subject: Allow a build to use strerror() instead of strerror_r()
+
+What fails: with -D_XOPEN_SOURCE=600 (needed for other declarations on
+AROS, e.g. fdopen() in crypto/rand/randfile.c), crypto/o_str.c calls
+strerror_r(), which the ABIv11 C library does not provide: undefined at
+link. Dropping the macro instead leaves fdopen() implicitly declared,
+truncating its pointer result on 64-bit.
+
+Fix: a build-defined macro, AROS_ST_NO_STRERROR_R, selects OpenSSL's
+existing strerror() fallback in openssl_strerror_r(). That branch copies
+the message with OPENSSL_strlcpy, so the result is NUL-terminated and
+truncated to the caller's buffer; buffers below 2 bytes return failure.
+
+Why this is acceptable here: the build is no-threads and aros-syncthing
+is single-threaded. ABIv11 strerror() returns constant strings for
+errno values; for values above MAX_ERRNO it formats a DOS error into a
+buffer kept in the stdc.library base, which concurrent callers sharing
+that base could overwrite. That is a limitation of this configuration,
+not a general fix.
+
+Scope: aros-syncthing's OpenSSL build only (macro defined by its Configure
+target).
+
+Verification: link of the ABIv11 probe has no undefined symbols; the
+build uses -Werror=implicit-function-declaration.
+
+Status: local limitation, not an upstream candidate.
+---
+--- a/crypto/o_str.c
++++ b/crypto/o_str.c
+@@ -400,7 +400,9 @@
+     if (err != buf)
+         OPENSSL_strlcpy(buf, err, buflen);
+     return 1;
+-#elif (defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) || (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE >= 600)
++#elif !defined(AROS_ST_NO_STRERROR_R) \
++    && ((defined(_POSIX_C_SOURCE) && _POSIX_C_SOURCE >= 200112L) \
++        || (defined(_XOPEN_SOURCE) && _XOPEN_SOURCE >= 600))
+     /*
+      * We can use "real" strerror_r. The OpenSSL version differs in that it
+      * gives 1 on success and 0 on failure for consistency with other OpenSSL

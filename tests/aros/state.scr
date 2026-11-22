@@ -1,0 +1,62 @@
+.key TAG/A,PEER/A,STATE/A
+; Persistent-state scenarios on AROS, driven by scripts/aros-state-test.sh.
+; The driver fills in the TAG, PEER and STATE placeholders and removes the
+; .key line; it changes Documents/Notes.txt on the peer after session 2 and
+; after session 5 (counted on the peer's log) and waits for the "done" marker.
+; STATE is the state file name for folder aros-state (state-<hash>.txt).
+; Results: RESULTS:state-<tag>-*. The destination SYS:st-state-<tag> is
+; copied to RESULTS: at the end and then deleted.
+FailAt 1000
+; The default Shell stack on AROS One (40960 bytes on fresh pool copies)
+; is too small to rely on for OpenSSL.
+Stack 262144
+Protect RAM:stp/stpoc +rwed
+Version >RESULTS:state-<TAG>-0-system.txt
+Version bsdsocket.library FULL >>RESULTS:state-<TAG>-0-system.txt
+Delete SYS:st-poc/id/<STATE>#? QUIET
+MakeDir SYS:st-state-<TAG>
+; 1: first run: the whole folder
+RAM:stp/stpoc RESULTS:state-<TAG>-1.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state SYS:st-state-<TAG> 300 0
+Echo "1 rc=$RC" >>RESULTS:state-<TAG>-8-rc.txt
+; 2: restart without changes: no requests
+RAM:stp/stpoc RESULTS:state-<TAG>-2.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state SYS:st-state-<TAG> 300 0
+Echo "2 rc=$RC" >>RESULTS:state-<TAG>-8-rc.txt
+; the host changes Documents/Notes.txt on the peer now
+Wait 30
+; 3: only the changed file is requested
+RAM:stp/stpoc RESULTS:state-<TAG>-3.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state SYS:st-state-<TAG> 300 0
+Echo "3 rc=$RC" >>RESULTS:state-<TAG>-8-rc.txt
+; 4a: a file deleted here is downloaded again
+Delete SYS:st-state-<TAG>/ReadMe.txt
+RAM:stp/stpoc RESULTS:state-<TAG>-4a.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state SYS:st-state-<TAG> 300 0
+Echo "4a rc=$RC" >>RESULTS:state-<TAG>-8-rc.txt
+; 4b: a file changed here with the same size (18 bytes) is kept
+Echo >SYS:st-state-<TAG>/ReadMe.txt "STATE TEST README"
+Copy SYS:st-state-<TAG>/ReadMe.txt RESULTS:state-<TAG>-4b-local-ReadMe.txt
+RAM:stp/stpoc RESULTS:state-<TAG>-4b.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state SYS:st-state-<TAG> 300 0
+Echo "4b rc=$RC" >>RESULTS:state-<TAG>-8-rc.txt
+Copy SYS:st-state-<TAG>/ReadMe.txt RESULTS:state-<TAG>-4b-after-ReadMe.txt
+; the user resolves the conflict by deleting the local copy
+Delete SYS:st-state-<TAG>/ReadMe.txt
+; the host changes Documents/Notes.txt again now
+Wait 30
+; 5: every state write fails: files are written and kept, failure reported
+RAM:stp/stpoc RESULTS:state-<TAG>-5.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state SYS:st-state-<TAG> 300 0 0 1
+Echo "5 rc=$RC" >>RESULTS:state-<TAG>-8-rc.txt
+; 5b: the next run adopts them by hash: no requests
+RAM:stp/stpoc RESULTS:state-<TAG>-5b.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state SYS:st-state-<TAG> 300 0
+Echo "5b rc=$RC" >>RESULTS:state-<TAG>-8-rc.txt
+; 6a: a damaged state file is rejected; files adopted by hash
+Echo >>SYS:st-poc/id/<STATE> "garbage"
+RAM:stp/stpoc RESULTS:state-<TAG>-6a.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state SYS:st-state-<TAG> 300 0
+Echo "6a rc=$RC" >>RESULTS:state-<TAG>-8-rc.txt
+; 6b: a deleted state file; files adopted by hash
+Delete SYS:st-poc/id/<STATE>
+RAM:stp/stpoc RESULTS:state-<TAG>-6b.log sync SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state SYS:st-state-<TAG> 300 0
+Echo "6b rc=$RC" >>RESULTS:state-<TAG>-8-rc.txt
+; final content for comparison on the host, then clean up
+Copy SYS:st-state-<TAG> RESULTS:state-<TAG>-final ALL QUIET
+Delete SYS:st-state-<TAG> ALL QUIET FORCE
+Delete SYS:st-poc/id/<STATE>#? QUIET
+Echo "done" >RESULTS:state-<TAG>-9-done.txt
+RAM:stp/stpoc RESULTS:state-<TAG>-9-marker.log run SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-state 30 0 done-<TAG>

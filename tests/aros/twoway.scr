@@ -1,0 +1,70 @@
+; Two-way first flow of stpoc on one AROS target (stage B of the two-way
+; plan), driven by scripts/aros-twoway.sh, which fills in <TAG>, <PEER>,
+; <PORT>, <OUT> (the run's results directory) and <DEST> (a new directory
+; on SYS:) and stages this script with stpoc and the test identity (id/).
+;
+; Files are created and edited here on AROS; the peer's folder tw-<TAG>
+; holds one file of its own. The guest signals the host by connecting
+; with a marker device name to folder mk-<TAG>: after twchg-<TAG> the host
+; edits a.txt on the peer, done-<TAG> ends the run. Everything written
+; outside RAM: is under <DEST>, created here, marked with its OWNER file
+; and deleted by its exact name at the end. Run it once per boot.
+FailAt 1000
+Stack 262144
+Protect RAM:stp/stpoc +rwed
+If EXISTS <DEST>
+  Echo "<DEST> exists already; nothing done" >><OUT>/0-refused.txt
+  Quit 10
+EndIf
+Version ><OUT>/0-system.txt
+Version exec.library FULL >><OUT>/0-system.txt
+Version dos.library FULL >><OUT>/0-system.txt
+Version bsdsocket.library FULL >><OUT>/0-system.txt
+Date >><OUT>/0-system.txt
+Info SYS: >><OUT>/0-system.txt
+MakeDir <DEST> <DEST>/id <DEST>/tw <DEST>/tw/sub
+Echo "[<TAG>]" ><DEST>/OWNER
+Copy RAM:stp/id/cert.pem RAM:stp/id/key.pem <DEST>/id QUIET
+
+; Created on AROS.
+Echo "created on AROS" ><DEST>/tw/a.txt
+Echo "nested, created on AROS" ><DEST>/tw/sub/b.txt
+Wait 3
+
+RAM:stp/stpoc <OUT>/1-first.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 600
+Echo "1-first rc=$RC" >><OUT>/rc.txt
+RAM:stp/stpoc <OUT>/2-restart.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 600
+Echo "2-restart rc=$RC" >><OUT>/rc.txt
+
+; The peer edits a.txt.
+RAM:stp/stpoc <OUT>/3-marker.log run <DEST>/id 10.0.2.2 <PORT> <PEER> mk-<TAG> 120 0 twchg-<TAG>
+Wait 45
+RAM:stp/stpoc <OUT>/4-peer-edit.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 600
+Echo "4-peer-edit rc=$RC" >><OUT>/rc.txt
+Copy <DEST>/tw/a.txt <OUT>/4-a.txt
+RAM:stp/stpoc <OUT>/5-restart.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 600
+Echo "5-restart rc=$RC" >><OUT>/rc.txt
+
+; Edited on AROS. The new text has the same length (36 bytes) as the
+; peer's: on FAT the handler keeps the old date, so only hashing finds it.
+Wait 3
+Echo "edited again on AROS, a longer line" ><DEST>/tw/a.txt
+RAM:stp/stpoc <OUT>/6-local-edit.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 600
+Echo "6-local-edit rc=$RC" >><OUT>/rc.txt
+RAM:stp/stpoc <OUT>/7-restart.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 600
+Echo "7-restart rc=$RC" >><OUT>/rc.txt
+
+Copy <DEST>/tw <OUT>/tw ALL QUIET
+Copy <DEST>/id/state-#?.txt <OUT> QUIET
+List <DEST>/tw ALL >><OUT>/8-list.txt
+Search >NIL: <DEST>/OWNER "[<TAG>]"
+If NOT WARN
+  Delete <DEST> ALL QUIET FORCE
+EndIf
+If EXISTS <DEST>
+  Echo "<DEST> NOT removed" >><OUT>/9-cleanup.txt
+Else
+  Echo "<DEST> removed" >><OUT>/9-cleanup.txt
+EndIf
+Echo "done" ><OUT>/9-done.txt
+RAM:stp/stpoc <OUT>/9-marker.log run RAM:stp/id 10.0.2.2 <PORT> <PEER> mk-<TAG> 60 0 done-<TAG>

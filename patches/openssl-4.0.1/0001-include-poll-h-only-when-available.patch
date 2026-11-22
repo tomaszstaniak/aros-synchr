@@ -1,0 +1,56 @@
+Subject: Include <poll.h> only when the C library provides it
+
+What fails: include/internal/sockets.h includes <poll.h> on every
+OPENSSL_SYS_UNIX target. The AROS SDKs used here (ABIv11 SDK, ABIv11
+2026.09 SDK, mainline x86_64 SDK) have no <poll.h>, so most of libcrypto
+fails with "poll.h: No such file or directory".
+
+Why this fix: the only poll() users in the libraries (crypto/bio/bio_sock.c
+BIO_socket_wait, ssl/quic/quic_reactor.c, ssl/rio/*) already fall back to
+select() when POLLIN is undefined. So the include is the only problem, and
+the condition asks the compiler whether the header exists rather than
+naming a system: behaviour is unchanged wherever <poll.h> exists, and a
+compiler without __has_include keeps the old behaviour. The check is
+nested (#if defined(__has_include) / #if __has_include(...)) because a
+preprocessor without the feature cannot parse the call even in a branch
+that && would short-circuit.
+
+Scope: all targets; effective only where <poll.h> is absent. Built for
+x86_64 AROS ABIv11 (GCC 10.5.0, no-dgram, i.e. without QUIC); the select()
+fallback itself is not exercised by aros-syncthing, which supplies its own
+socket BIO.
+
+Verification: with this patch libcrypto/libssl compile for ABIv11 (GCC
+10.5.0) and the probe links with no undefined symbols; on the macOS host
+(clang) the header still includes <poll.h> (POLLIN defined). The branch
+for a compiler without __has_include was not compiled. Mainline contrib carries an equivalent
+change guarded by OPENSSL_SYS_AROS (openssl-4.0.1-aros.diff).
+
+Status: upstream candidate (to OpenSSL), not yet proposed. Not checked
+against 3.5.
+---
+--- a/include/internal/sockets.h
++++ b/include/internal/sockets.h
+@@ -118,7 +118,21 @@
+ #endif
+ 
+ #ifdef OPENSSL_SYS_UNIX
+-#ifndef OPENSSL_SYS_TANDEM
++/*
++ * Some Unix-like C libraries (AROS) provide no <poll.h>. Ask the compiler
++ * whether the header exists instead of naming systems; without it POLLIN
++ * stays undefined and the poll() users fall back to select(). The test is
++ * nested: a preprocessor without __has_include must not even see the
++ * __has_include(<...>) expression.
++ */
++#if defined(__has_include)
++#if __has_include(<poll.h>)
++#define OSSL_INTERNAL_HAVE_POLL_H
++#endif
++#else
++#define OSSL_INTERNAL_HAVE_POLL_H
++#endif
++#if !defined(OPENSSL_SYS_TANDEM) && defined(OSSL_INTERNAL_HAVE_POLL_H)
+ #include <poll.h>
+ #endif
+ #include <errno.h>

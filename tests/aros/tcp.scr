@@ -1,0 +1,12 @@
+; TCP receive reproducer (tests/aros/tcpburst.c) against
+; tests/tcpburst-server.py on the host at port <PORT>: four connections,
+; each receiving 512 KiB in one burst; two with the default receive
+; buffer, two with SO_RCVBUF 256 KiB. Results: <OUT>/tcp-*.txt.
+FailAt 1000
+Protect RAM:stp/tcpburst +rwed
+Version bsdsocket.library FULL ><OUT>/tcp-0-system.txt
+RAM:stp/tcpburst 10.0.2.2 <PORT> 524288 0 <OUT>/tcp-1-default.txt
+RAM:stp/tcpburst 10.0.2.2 <PORT> 524288 0 <OUT>/tcp-2-default.txt
+RAM:stp/tcpburst 10.0.2.2 <PORT> 524288 262144 <OUT>/tcp-3-rcvbuf256k.txt
+RAM:stp/tcpburst 10.0.2.2 <PORT> 524288 262144 <OUT>/tcp-4-rcvbuf256k.txt
+Echo "done" ><OUT>/tcp-9-done.txt

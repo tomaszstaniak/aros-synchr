@@ -1,0 +1,35 @@
+{
+  "id": "fat-write-date",
+  "upstream": "https://github.com/aros-development-team/AROS",
+  "base": "9fad9388ac77d72007a1feabb8c934c1b2c8debe",
+  "checked_upstream": "9fad9388ac77d72007a1feabb8c934c1b2c8debe",
+  "checked_date": "2026-11-10",
+  "status": "upstream",
+  "submission_url": "https://github.com/aros-development-team/AROS/pull/2197",
+  "submission_revision": "5e6134e19016fc985f3ccee2da6501d2587d88a7",
+  "series": [
+    "0001-fat-set-the-modification-date-when-a-file-is-written.patch",
+    "0002-fat-compare-the-write-date-with-the-cached-entry-not.patch"
+  ],
+  "v1_applicability": "Mainline v1 rom/filesys/fat; every target that uses fat-handler (FAT32 SYS: on raspi-aarch64, FAT volumes on pc-x86_64).",
+  "validation": {
+    "build": [
+      "kernel-fs-fat and test-fat-writedate, pc-x86_64, x86_64-aros-gcc 10.5.0, isolated build of 5e6134e19016fc985f3ccee2da6501d2587d88a7: no diagnostics; ops.c and fatwritedate.c also with -Wall (-Wextra for the test) and -Werror=implicit-function-declaration: none",
+      "same targets, raspi-aarch64, clang 20.1.0 (project toolchain): no diagnostics; link with TARGET_C_LIBS pointing at the toolchain's builtins library",
+      "nm: symbol set of the fixed handler equals an unchanged build of master 9fad9388 on both targets"
+    ],
+    "runtime": "fatwritedate on official 20261105 x86_64 v1 (QEMU, v1-3) and raspi-aarch64 non-SMP (QEMU, rpi-1), runs fatwd4-*: unchanged master 11 FAIL (dates not updated, incl. a write after an adopted lock); fixed handler with FIRST = unchanged master (lock allocated by the other binary, adopted in DoDiskInsert) PASS twice in one boot on both."
+  },
+  "tested_targets": [
+    "pc-x86_64 v1 (build and runtime)",
+    "raspi-aarch64 v1 (build and runtime)"
+  ],
+  "limitations": [
+    "the fixed handler was loaded per mount (Mountlist FileSystem), not installed as the system's FAT handler",
+    "FAT12/FAT16 images not tested separately (same code path)"
+  ],
+  "evidence": "aros-syncthing private docs/evidence/fatwd2-v1-20261110 and fatwd2-pi-20261110",
+  "local_workaround": "aros-syncthing hashes every file at each scan on FAT volumes (d967e03).",
+  "next_action": "Follow PR #2197 review (second commit 5e6134e1 answers the adopted-lock and gl->attr points; may be squashed on merge). Then a separate PR: shared FAT image builder for fatfullroot, parent_rename and fatwritedate (suggested in review).",
+  "last_review": "2026-11-10"
+}

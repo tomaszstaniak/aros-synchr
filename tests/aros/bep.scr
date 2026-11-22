@@ -1,0 +1,39 @@
+.key TAG/A,PEER/A,WRONG/A
+; AROS Shell script for the BEP PoC; staged with stpoc and run as
+;   Execute RAM:stp/bep.scr <tag> <peer-id> <wrong-id>
+; while the host runs scripts/peer-change-after-connect.sh for this
+; device. Results: RESULTS:bep-<tag>-* (new names for every run).
+; The client identity is SYS:st-poc/id, kept from earlier runs.
+FailAt 1000
+; The default Shell stack on AROS One (40960 bytes on fresh pool copies)
+; is too small to rely on for OpenSSL.
+Stack 262144
+Protect RAM:stp/stpoc +rwed
+Version >RESULTS:bep-<TAG>-0-system.txt
+Version bsdsocket.library FULL >>RESULTS:bep-<TAG>-0-system.txt
+; 1: the persistent identity
+RAM:stp/stpoc RESULTS:bep-<TAG>-1-identity.log identity-show SYS:st-poc/id
+Echo "1-identity rc=$RC" >>RESULTS:bep-<TAG>-8-rc.txt
+; 2: Hello, ClusterConfig, empty Index, the peer's Index, then one
+;    IndexUpdate after the host changes sub/nested.txt
+RAM:stp/stpoc RESULTS:bep-<TAG>-2-run.log run SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-poc-1 180 1 aros-v11
+Echo "2-run rc=$RC" >>RESULTS:bep-<TAG>-8-rc.txt
+; 3: a new process with the same identity: same Device ID, index again
+RAM:stp/stpoc RESULTS:bep-<TAG>-3-rerun.log run SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-poc-1 60 0 aros-v11
+Echo "3-rerun rc=$RC" >>RESULTS:bep-<TAG>-8-rc.txt
+; 4: wrong expected peer Device ID: refused before any BEP byte
+RAM:stp/stpoc RESULTS:bep-<TAG>-4-wrong-id.log run SYS:st-poc/id 10.0.2.2 22100 <WRONG> aros-poc-1 30 0 aros-v11
+Echo "4-wrong-id rc=$RC" >>RESULTS:bep-<TAG>-8-rc.txt
+; 6: idle: index, then no change on the peer; must send Ping and end by
+;    itself at the time limit (expected RESULT FAIL TIME_LIMIT)
+RAM:stp/stpoc RESULTS:bep-<TAG>-6-idle.log run SYS:st-poc/id 10.0.2.2 22100 <PEER> aros-poc-1 45 1 aros-v11
+Echo "6-idle rc=$RC" >>RESULTS:bep-<TAG>-8-rc.txt
+; 5: identity creation with this binary (exclusive create), and a second
+;    create into the same directory, which must refuse to overwrite
+MakeDir RAM:stp/newid
+RAM:stp/stpoc RESULTS:bep-<TAG>-5-create.log identity-create RAM:stp/newid
+Echo "5-create rc=$RC" >>RESULTS:bep-<TAG>-8-rc.txt
+RAM:stp/stpoc RESULTS:bep-<TAG>-5-create-again.log identity-create RAM:stp/newid
+Echo "5-create-again rc=$RC" >>RESULTS:bep-<TAG>-8-rc.txt
+List RAM:stp/newid >RESULTS:bep-<TAG>-5-newid-dir.txt
+Echo "done" >RESULTS:bep-<TAG>-9-done.txt

@@ -1,0 +1,45 @@
+; Where the per-file time goes on a target, driven by scripts/aros-accept.sh
+; (placeholders as in accept.scr, plus <STFLAT>/<STTREE>: the state file
+; names of folders multi-<TAG> and tree-<TAG>). Each run adopts 1000 files
+; that are already here and ends with a "profile:" line in its log.
+;   T1  flat:  1000 files in one directory, console on, log on SYS:
+;   T2  tree:  the same 1000 files in 10 directories of 100, same logging
+;   T3  flat again with --brief and the log in RAM: (state deleted first)
+; Everything outside RAM: is under <DEST>, deleted by its exact name.
+FailAt 1000
+Stack 262144
+Protect RAM:stp/stpoc +rwed
+If EXISTS <DEST>
+  Echo "<DEST> exists already; nothing done" >><OUT>/pf-0-refused.txt
+  Quit 10
+EndIf
+Info SYS: ><OUT>/pf-0-system.txt
+MakeDir <DEST> <DEST>/id <DEST>/flat <DEST>/tree
+Echo "[<TAG>]" ><DEST>/OWNER
+Copy RAM:stp/id/cert.pem RAM:stp/id/key.pem <DEST>/id QUIET
+Copy RAM:stp/pre/#? <DEST>/flat QUIET
+Copy RAM:stp/pretree <DEST>/tree ALL QUIET
+; T1
+RAM:stp/stpoc <DEST>/pf-1-flat.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> multi-<TAG> <DEST>/flat 3600 0
+Echo "1-flat rc=$RC" >><OUT>/pf-8-rc.txt
+Copy <DEST>/pf-1-flat.log <OUT>/pf-1-flat.log
+; T2
+RAM:stp/stpoc <DEST>/pf-2-tree.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> tree-<TAG> <DEST>/tree 3600 0
+Echo "2-tree rc=$RC" >><OUT>/pf-8-rc.txt
+Copy <DEST>/pf-2-tree.log <OUT>/pf-2-tree.log
+; T3: forget the state so the files are adopted again
+Delete <DEST>/id/<STFLAT>
+RAM:stp/stpoc >NIL: --brief RAM:stp/pf-3-flat-brief.log sync <DEST>/id 10.0.2.2 <PORT> <PEER> multi-<TAG> <DEST>/flat 3600 0
+Echo "3-flat-brief rc=$RC" >><OUT>/pf-8-rc.txt
+Copy RAM:stp/pf-3-flat-brief.log <OUT>/pf-3-flat-brief.log
+
+Search >NIL: <DEST>/OWNER "[<TAG>]"
+If NOT WARN
+  Delete <DEST> ALL QUIET FORCE
+EndIf
+If EXISTS <DEST>
+  Echo "<DEST> NOT removed" >><OUT>/pf-9-cleanup.txt
+Else
+  Echo "<DEST> removed" >><OUT>/pf-9-cleanup.txt
+EndIf
+RAM:stp/stpoc <OUT>/pf-9-marker.log run RAM:stp/id 10.0.2.2 <PORT> <PEER> tree-<TAG> 60 0 done-pf-<TAG>

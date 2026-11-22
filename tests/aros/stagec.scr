@@ -1,0 +1,144 @@
+; Two-way stage C of stpoc on one AROS target, driven by
+; scripts/aros-stagec.sh, which fills in <TAG>, <PEER>, <PORT>, <OUT> (the
+; run's results directory), <DEST> (a new directory on SYS:) and <STATE>
+; (the state file's name) and stages this script with stpoc and the test
+; identity (id/).
+;
+; Changes here are made by this script; changes on the peer are made by the
+; host when this script connects with a marker device name (s3-<TAG> ...)
+; to folder mk-<TAG>. Dates that decide a conflict are set far apart
+; (SetDate here, days on the host), so the outcome does not depend on how
+; close the guest's clock is to the host's. Everything written outside RAM:
+; is under <DEST>, created here, marked with its OWNER file and deleted by
+; its exact name at the end. Run it once per boot.
+FailAt 1000
+Stack 262144
+Protect RAM:stp/stpoc +rwed
+If EXISTS <DEST>
+  Echo "<DEST> exists already; nothing done" >><OUT>/0-refused.txt
+  Quit 10
+EndIf
+Version ><OUT>/0-system.txt
+Version dos.library FULL >><OUT>/0-system.txt
+Version bsdsocket.library FULL >><OUT>/0-system.txt
+Date >><OUT>/0-system.txt
+Info SYS: >><OUT>/0-system.txt
+MakeDir <DEST> <DEST>/id <DEST>/tw <DEST>/tw/dir <DEST>/tw/dir/deep
+Echo "[<TAG>]" ><DEST>/OWNER
+Copy RAM:stp/id/cert.pem RAM:stp/id/key.pem <DEST>/id QUIET
+Echo "a, created here" ><DEST>/tw/a.txt
+Echo "b, created here" ><DEST>/tw/b.txt
+Echo "c, created here" ><DEST>/tw/c.txt
+Echo "d, created here" ><DEST>/tw/d.txt
+Echo "e, created here" ><DEST>/tw/e.txt
+Echo "inside" ><DEST>/tw/dir/in.txt
+Echo "deeper" ><DEST>/tw/dir/deep/x.txt
+Wait 3
+
+; 1: everything here reaches the peer, p1.txt and p2.txt come from it.
+RAM:stp/stpoc <OUT>/01-first.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "01 rc=$RC" >><OUT>/rc.txt
+
+; 2: deleted here: a file, and a directory with everything in it.
+Delete <DEST>/tw/a.txt QUIET
+Delete <DEST>/tw/dir ALL QUIET
+RAM:stp/stpoc <OUT>/02-deleted-here.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "02 rc=$RC" >><OUT>/rc.txt
+
+; 3: the peer deletes b.txt.
+RAM:stp/stpoc <OUT>/03-marker.log run <DEST>/id 10.0.2.2 <PORT> <PEER> mk-<TAG> 120 0 s3-<TAG>
+Wait 30
+RAM:stp/stpoc <OUT>/03-deleted-there.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "03 rc=$RC" >><OUT>/rc.txt
+
+; 4: c.txt edited here and on the peer (dated 30 days ahead): the peer's
+; wins, ours becomes a conflict copy.
+Echo "c, edited here first" ><DEST>/tw/c.txt
+RAM:stp/stpoc <OUT>/04-marker.log run <DEST>/id 10.0.2.2 <PORT> <PEER> mk-<TAG> 120 0 s4-<TAG>
+Wait 30
+RAM:stp/stpoc <OUT>/04-both-peer-wins.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "04 rc=$RC" >><OUT>/rc.txt
+RAM:stp/stpoc <OUT>/04b-again.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "04b rc=$RC" >><OUT>/rc.txt
+
+; 5: d.txt edited on the peer (dated a month back), then here (now): ours
+; wins, the peer keeps its own as a conflict copy, which comes here.
+RAM:stp/stpoc <OUT>/05-marker.log run <DEST>/id 10.0.2.2 <PORT> <PEER> mk-<TAG> 120 0 s5-<TAG>
+Wait 30
+Echo "d, edited here later" ><DEST>/tw/d.txt
+RAM:stp/stpoc <OUT>/05-both-ours-wins.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "05 rc=$RC" >><OUT>/rc.txt
+Wait 15
+RAM:stp/stpoc <OUT>/05b-again.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "05b rc=$RC" >><OUT>/rc.txt
+
+; 6: e.txt edited here (dated a week back), then deleted on the peer: the
+; deletion wins, our edit stays as a conflict copy.
+Echo "e, edited here before the deletion" ><DEST>/tw/e.txt
+SetDate <DEST>/tw/e.txt DATE 01-Nov-26 TIME 12:00:00 >><OUT>/06-setdate.txt
+Echo "SetDate rc=$RC" >><OUT>/06-setdate.txt
+List <DEST>/tw/e.txt >><OUT>/06-setdate.txt
+Date >><OUT>/06-setdate.txt
+RAM:stp/stpoc <OUT>/06-marker.log run <DEST>/id 10.0.2.2 <PORT> <PEER> mk-<TAG> 120 0 s6-<TAG>
+Wait 30
+RAM:stp/stpoc <OUT>/06-edit-then-delete.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "06 rc=$RC" >><OUT>/rc.txt
+RAM:stp/stpoc <OUT>/06b-again.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "06b rc=$RC" >><OUT>/rc.txt
+
+; 7: p1.txt deleted here, then edited on the peer (dated a month ahead): the
+; edit wins, the file comes back.
+Delete <DEST>/tw/p1.txt QUIET
+RAM:stp/stpoc <OUT>/07-marker.log run <DEST>/id 10.0.2.2 <PORT> <PEER> mk-<TAG> 120 0 s7-<TAG>
+Wait 30
+RAM:stp/stpoc <OUT>/07-delete-then-edit.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "07 rc=$RC" >><OUT>/rc.txt
+RAM:stp/stpoc <OUT>/07b-again.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "07b rc=$RC" >><OUT>/rc.txt
+
+; 8: a large file from the peer (<BIGMB> MB), the session cut off by its time limit in
+; the middle of the download; the next session completes it.
+RAM:stp/stpoc <OUT>/08-marker.log run <DEST>/id 10.0.2.2 <PORT> <PEER> mk-<TAG> 120 0 s8-<TAG>
+Wait 30
+RAM:stp/stpoc <OUT>/08-cut.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 15
+Echo "08 rc=$RC" >><OUT>/rc.txt
+List <DEST>/tw ALL >><OUT>/08-list.txt
+RAM:stp/stpoc <OUT>/08b-complete.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 1800
+Echo "08b rc=$RC" >><OUT>/rc.txt
+
+; 9: restart: nothing to do.
+RAM:stp/stpoc <OUT>/09-restart.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "09 rc=$RC" >><OUT>/rc.txt
+
+; 10: state lost and c.txt missing here: no deletion is published, c.txt
+; comes back from the peer.
+Copy <DEST>/id/<STATE> <OUT>/10-state-before.txt QUIET
+Delete <DEST>/id/<STATE> QUIET
+Delete <DEST>/tw/c.txt QUIET
+RAM:stp/stpoc <OUT>/10-state-lost.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "10 rc=$RC" >><OUT>/rc.txt
+RAM:stp/stpoc <OUT>/10b-again.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 900
+Echo "10b rc=$RC" >><OUT>/rc.txt
+
+; 11: no .stfolder: unavailable, nothing changes.
+Rename <DEST>/tw/.stfolder <DEST>/stfolder-aside
+RAM:stp/stpoc <OUT>/11-no-marker.log twoway <DEST>/id 10.0.2.2 <PORT> <PEER> tw-<TAG> <DEST>/tw 120
+Echo "11 rc=$RC" >><OUT>/rc.txt
+Rename <DEST>/stfolder-aside <DEST>/tw/.stfolder
+
+; big.bin is not copied (the results volume is small); step 10 shows it
+; equal to the peer's entry.
+Copy <DEST>/tw/~(big.bin) <OUT>/tw ALL QUIET
+Copy <DEST>/id/<STATE> <OUT> QUIET
+List <DEST>/tw ALL >><OUT>/12-list.txt
+Search >NIL: <DEST>/OWNER "[<TAG>]"
+If NOT WARN
+  Delete <DEST> ALL QUIET FORCE
+EndIf
+If EXISTS <DEST>
+  Echo "<DEST> NOT removed" >><OUT>/13-cleanup.txt
+Else
+  Echo "<DEST> removed" >><OUT>/13-cleanup.txt
+EndIf
+Echo "done" ><OUT>/13-done.txt
+RAM:stp/stpoc <OUT>/13-marker.log run RAM:stp/id 10.0.2.2 <PORT> <PEER> mk-<TAG> 60 0 done-<TAG>
