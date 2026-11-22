@@ -1,30 +1,73 @@
 # Synchr
 
-Synchr keeps drawers on an AROS computer the same as folders on your other
-computers that run [Syncthing](https://syncthing.net). A file added,
-changed or deleted on one side appears on the other.
+Synchr keeps files on your AROS computer the same as on your other
+computers and your phone. Put a file in a drawer on AROS and it appears
+in a folder on your PC; change it on the PC and the change comes back to
+AROS. It works with Syncthing, so the other side can be Windows, macOS,
+Linux or Android.
 
-Synchr speaks Syncthing's own protocol, so nothing else has to be
-installed on the other computer. It is not made by the Syncthing project.
+![The Synchr window: this computer's Device ID, one connected device and two folders that are up to date](docs/images/synchr-window.png)
 
-- Add a device by its Device ID; the address can stay empty. Synchr finds
-  the other computer on the local network or through Syncthing's public
-  discovery servers.
-- Works across networks: when a router stands between the computers, the
-  connection goes through one of Syncthing's public relays. Both sides
-  check each other's Device ID and everything between them is encrypted.
-- Two-way: new, changed and deleted files go both ways. A file changed on
-  both sides keeps the other version next to it as a conflict copy, named
-  as Syncthing names it.
-- Keeps synchronising after the window is closed, and can start with the
-  system without opening the window.
+## What is Syncthing?
+
+[Syncthing](https://syncthing.net) is a free, open-source program that
+keeps folders the same on several devices. The devices talk to each other
+directly; your files are not stored on anyone's server and there is no
+account to create. Each device has a Device ID, a long code that the
+devices use to recognise each other, and you choose which folders each
+device gets.
+
+Syncthing itself does not run on AROS. Synchr is a separate program for
+AROS that speaks Syncthing's protocol, so to your other devices your AROS
+computer looks like one more Syncthing device. On the other computers you
+use the ordinary Syncthing. Synchr is not made by the Syncthing project.
+
+## What you can do with it
+
+- Work on a document on AROS and find it on your PC, or the other way
+  round.
+- Keep a copy of your AROS work on another computer, updated as you go.
+- Bring photos or music from a phone that runs Syncthing to AROS.
+
+Synchr copies new, changed and deleted files in both directions. If the
+same file was changed on both sides before they met, nothing is lost: the
+other version is kept next to it as a conflict copy.
+
+The other computer does not have to be on the same network. Synchr finds
+it through Syncthing's public servers, as Syncthing does, and when a
+router stands in the way the connection goes through one of Syncthing's
+relays. The devices check each other's Device ID and everything between
+them is encrypted, so a relay cannot read your files.
+
+Synchr keeps working when you close its window, and it can start with the
+system.
+
+## Getting started
+
+1. Install Syncthing on your other computer or phone if it is not there
+   yet ([downloads](https://syncthing.net/downloads/)).
+2. Install Synchr on AROS (below) and double-click it. The window shows
+   your AROS computer's Device ID.
+3. In Synchr, Add device: paste the other computer's Device ID (in
+   Syncthing: Actions, Show ID). Syncthing on the other side asks whether
+   to accept the new device; accept it.
+4. In Syncthing, share a folder with the AROS device. In Synchr, Add
+   folder: the same folder ID and the drawer on AROS that should hold it.
+
+The ReadMe in the Synchr drawer goes through the same steps in more
+detail.
 
 ## Installation
 
-Download the archive for your system from the
+With apkg:
+
+```
+apkg install synchr
+```
+
+Or download the archive for your system from the
 [releases](https://github.com/tomaszstaniak/aros-synchr/releases), unpack
-it anywhere and double-click Synchr. The ReadMe in the drawer walks
-through connecting the first device.
+it anywhere and double-click Synchr.
 
 | System | Archive |
 |---|---|
@@ -32,14 +75,21 @@ through connecting the first device.
 | Mainline AROS x86_64 (ABIv1), a nightly from 2026-11-06 or later | `Synchr-<version>-aros-x86_64-abiv1-pc.zip` |
 | Raspberry Pi (AArch64, ABIv1) | `Synchr-<version>-aros-aarch64-abiv1-raspi.zip` |
 
-The archives are not interchangeable. Synchr needs a running TCP/IP stack.
+The archives are not interchangeable. Synchr needs a working network
+connection on AROS.
 
-Not there yet: IPv6, QUIC, UPnP port mapping, a folder shared with
-several devices, file names outside ASCII.
+## Good to know
 
-Known issue: on AROS in QEMU with the e1000 network card, the whole system
-can stop while Synchr is connecting or transferring. The rtl8139 card
-works. Please report it if you see this on a real computer.
+- Try it with a test folder first. Synchronising works both ways:
+  deleting a file on one side deletes it on the other.
+- A folder is kept in step with one other device for now.
+- IPv6 and automatic port opening on routers (UPnP) are not supported
+  yet. Without them, connections between different networks go through a
+  relay, which works but is slower.
+- File names with letters outside ASCII have not been tested yet.
+- Known issue: on AROS in QEMU with the e1000 network card, the whole
+  system can stop while Synchr is transferring. The rtl8139 card works.
+  Please report it if you see this on a real computer.
 
 ## Support and feedback
 
@@ -47,77 +97,14 @@ Reports, ideas and support for further work are welcome at
 [Patreon](https://www.patreon.com/reperspective) and
 [Ko-fi](https://ko-fi.com/enbewu).
 
-## For developers
+## Building from source
 
-Synchr is a native C client of Syncthing's Block Exchange Protocol; it
-does not run Syncthing's Go program. The engine is `stpoc` (packaged as
-`SynchrEngine`), the window is `gui/stgui.c` (Zune).
+Synchr is written in C, with a Zune window and OpenSSL for the encrypted
+connections. Building and testing are described in
+[docs/development.md](docs/development.md).
 
-The first stage was a receiver that connects to a Syncthing device over
-TLS 1.3, authenticates it by Device ID, receives one folder's complete
-index (also when the peer sends it in several parts) and downloads its
-files, each verified block by block and written under its final name only
-when complete. After a restart unchanged files are recognised by their
-hashes and not downloaded again. Files changed locally, also while a
-download is running, are kept and reported as conflicts. Built for AROS
-x86_64 (mainline ABIv1 and ABIv11) and for the native Raspberry Pi
-(aarch64, ABIv1).
+## Licence
 
-The two-way mode (`stpoc twoway`) synchronises one folder with one
-Syncthing device in both directions: new and changed files, deletions,
-conflicts (both contents are kept, named as Syncthing names conflict
-copies) and recovery after an interrupted download or state write.
-Restarts neither repeat announcements nor create conflicts.
-
-The engine (`stpoc engine`) is the program that stays running: it keeps
-several folders in sync, each with one Syncthing device, from a
-configuration file (`src/conf.h`), reconnects when a connection is lost
-and stops on Ctrl-C. A folder stays open for the whole run: it is read
-at its interval without a connection too, so what changed meanwhile is
-recorded and goes out when the device is back. A running engine answers
-commands (status of every device and folder, scan now, pause and resume
-a folder for this run, stop) at a public ARexx port; `stpoc ctl` sends
-them, for example `stpoc ctl PAUSE folder-id` (`src/ctl.h`).
-
-Reaching devices works as in Syncthing (`src/reach.h`): the engine
-listens for connections (TCP 22000), belongs to a relay from Syncthing's
-public pool and takes sessions through it, announces where it can be
-reached to global discovery and on the local network, and finds devices
-without a typed address through both, connecting directly or through
-their relays (Relay Protocol v1, `src/relay.h`). Each can be switched
-off in the configuration. Not there yet: IPv6, QUIC, UPnP port mapping,
-a folder shared with several devices, names outside ASCII (they are
-rejected).
-
-`scripts/reach-host-test.sh` checks all of this on the host with
-unmodified Syncthing devices and Syncthing's own relay and discovery
-servers built from source; `scripts/aros-reach.sh` does the same in an
-AROS guest and adds a run against the public servers.
-
-See [documentation](docs/README.md) and [contributor instructions](docs/development.md).
-
-### Licence
-
-MIT (see `LICENSE`); two files derived from Syncthing are under the
+MIT (see `LICENSE`). Two files derived from Syncthing are under the
 Mozilla Public License 2.0, and the AROS programs include OpenSSL and
 jitterentropy: see `NOTICE`.
-
-### The window and the package
-
-`scripts/build.sh aros gui` builds its
-window (`gui/stgui.c`, Zune); `scripts/package.sh` packs the window, the
-engine (as `SynchrEngine`), icons drawn by `scripts/make-icons.py`, a
-ReadMe for users (`packaging/ReadMe.txt`) and the licence files into
-`dist/Synchr-<version>-<target>.zip` for the configured target.
-
-The window makes this device's identity in the drawer `Data` next to it,
-shows the Device ID (Copy puts it on the clipboard), takes devices (name,
-Device ID; the address may stay empty, the device is then found on the
-local network or through global discovery) and folders (folder ID, drawer),
-changes them (button or double click), writes `Data/engine.conf`, starts
-the engine and shows what it reports through its control port `SYNCHR`.
-Folders can be paused, resumed and read again. Closing the window leaves
-the engine running; the menu item "Stop synchronising and quit" ends
-both. "Use Syncthing's public servers" switches global discovery and
-relays on or off. "Start with the system" writes `SYS:WBStartup/Synchr.info` with the
-tool type HIDE: at boot the engine starts without a window.

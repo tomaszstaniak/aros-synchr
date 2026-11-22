@@ -1,9 +1,65 @@
 ---
 type: guide
-updated: 2026-11-09
+updated: 2026-11-22
 ---
 
 # Development
+
+## How the parts fit
+
+Synchr is a native C client of Syncthing's Block Exchange Protocol; it
+does not run Syncthing's Go program. The engine is `stpoc` (packaged as
+`SynchrEngine`), the window is `gui/stgui.c` (Zune).
+
+The two-way mode (`stpoc twoway`) synchronises one folder with one
+Syncthing device in both directions: new and changed files, deletions,
+conflicts (both contents are kept, named as Syncthing names conflict
+copies) and recovery after an interrupted download or state write.
+Restarts neither repeat announcements nor create conflicts.
+
+The engine (`stpoc engine`) is the program that stays running: it keeps
+several folders in sync, each with one Syncthing device, from a
+configuration file (`src/conf.h`), reconnects when a connection is lost
+and stops on Ctrl-C. A folder stays open for the whole run: it is read
+at its interval without a connection too, so what changed meanwhile is
+recorded and goes out when the device is back. A running engine answers
+commands (status of every device and folder, scan now, pause and resume
+a folder for this run, stop) at a public ARexx port; `stpoc ctl` sends
+them, for example `stpoc ctl PAUSE folder-id` (`src/ctl.h`).
+
+Reaching devices works as in Syncthing (`src/reach.h`): the engine
+listens for connections (TCP 22000), belongs to a relay from Syncthing's
+public pool and takes sessions through it, announces where it can be
+reached to global discovery and on the local network, and finds devices
+without a typed address through both, connecting directly or through
+their relays (Relay Protocol v1, `src/relay.h`). Each can be switched
+off in the configuration. Not there yet: IPv6, QUIC, UPnP port mapping,
+a folder shared with several devices, names outside ASCII (they are
+rejected).
+
+`scripts/reach-host-test.sh` checks all of this on the host with
+unmodified Syncthing devices and Syncthing's own relay and discovery
+servers built from source; `scripts/aros-reach.sh` does the same in an
+AROS guest and adds a run against the public servers.
+
+`scripts/build.sh aros gui` builds its
+window (`gui/stgui.c`, Zune); `scripts/package.sh` packs the window, the
+engine (as `SynchrEngine`), icons drawn by `scripts/make-icons.py`, a
+ReadMe for users (`packaging/ReadMe.txt`) and the licence files into
+`dist/Synchr-<version>-<target>.zip` for the configured target.
+
+The window makes this device's identity in the drawer `Data` next to it,
+shows the Device ID (Copy puts it on the clipboard), takes devices (name,
+Device ID; the address may stay empty, the device is then found on the
+local network or through global discovery) and folders (folder ID, drawer),
+changes them (button or double click), writes `Data/engine.conf`, starts
+the engine and shows what it reports through its control port `SYNCHR`.
+Folders can be paused, resumed and read again. Closing the window leaves
+the engine running; the menu item "Stop synchronising and quit" ends
+both. "Use Syncthing's public servers" switches global discovery and
+relays on or off. "Start with the system" writes `SYS:WBStartup/Synchr.info` with the
+tool type HIDE: at boot the engine starts without a window.
+
 
 ## Current scope
 
