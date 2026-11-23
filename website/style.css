@@ -146,3 +146,4 @@ footer nav a:hover{color:var(--ink)}
 .support-links{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
 .support-links a{color:#10201e;background:var(--accent);padding:10px 20px;border-radius:8px;font-weight:600;text-decoration:none}
 .support-links a:hover{background:#b4e6e0}
+.more-group{margin:34px 0 0;color:var(--muted);font-size:15px;text-transform:uppercase;letter-spacing:.06em}
