@@ -6,6 +6,8 @@ in a folder on your PC; change it on the PC and the change comes back to
 AROS. It works with Syncthing, so the other side can be Windows, macOS,
 Linux or Android.
 
+Home page: https://tomaszstaniak.github.io/aros-synchr/
+
 ![The Synchr window: this computer's Device ID, one connected device and two folders that are up to date](docs/images/synchr-window.png)
 
 ## What is Syncthing?
