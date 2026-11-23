@@ -15,7 +15,7 @@
 
 <section class="section wrap guide">
 <h1>Setting up Synchr, step by step</h1>
-<p class="intro">It takes about ten minutes. You go back and forth between two machines: your AROS computer and the other computer that runs Syncthing. Each step says which one it is on.</p>
+<p class="intro">It takes about ten minutes. You go back and forth between two machines: your AROS computer and the other computer that runs Syncthing.</p>
 
 <div class="before">
 <h2>Before you start</h2>
@@ -41,7 +41,7 @@
 <p>Click <b>Add device...</b> and fill in:</p>
 <ul>
 <li><b>Name</b>: one word you choose, for example <code>laptop</code>.</li>
-<li><b>Device ID</b>: the code from step 1. Capital or small letters and the dashes do not matter. If you mistype it, Synchr says "This is not a Device ID": the code has a check built in, so a typo cannot connect you to a wrong computer.</li>
+<li><b>Device ID</b>: the code from step 1. You can use uppercase or lowercase letters and leave out the dashes. If you mistype it, Synchr says "This is not a Device ID": the code has a check built in, so a typo cannot connect you to a wrong computer.</li>
 <li><b>Address</b> and <b>Port</b>: leave them empty. Synchr finds the other computer by its Device ID.</li>
 </ul>
 <p>Click <b>OK</b>. In a virtual machine with a shared clipboard you can copy the ID and paste it instead of typing.</p></li>
@@ -75,7 +75,7 @@
 <p>Click the other computer once in the list of devices, then click <b>Add folder...</b> and fill in:</p>
 <ul>
 <li><b>Folder ID</b>: exactly the Folder ID from step 6. Here capital and small letters do matter.</li>
-<li><b>Drawer</b>: the drawer on AROS that should hold the files. The button next to the field opens a file requester. A drawer that does not exist yet is made.</li>
+<li><b>Drawer</b>: the drawer on AROS that should hold the files. The button next to the field opens a file requester. Synchr creates the drawer if it doesn’t exist.</li>
 </ul>
 <p>Click <b>OK</b>.</p></li>
 
@@ -87,11 +87,11 @@
 <p class="note">Synchronising goes on when you close the window. To have it start with AROS, tick <b>Start with the system</b>. To stop it, choose <b>Stop synchronising and quit</b> in the Project menu.</p>
 
 <h2 id="more-computers">Part 3: your other computers</h2>
-<p class="lead">You may have Syncthing on several computers, say a laptop, a desktop and a phone. In Synchr each folder is kept in step with one of them. The others get the files through that one, the usual Syncthing way.</p>
+<p class="lead">For each folder, Synchr syncs with one computer. Pick the one you leave on most often. It can share that folder with your other devices.</p>
 <ol class="steps" start="9">
 <li><span class="on other">Other computer</span>
 <h3>Pick one computer for AROS</h3>
-<p>Choose the one that is switched on most often, and do parts 1 and 2 with it only. When it is off, AROS waits and catches up as soon as it is back.</p></li>
+<p>Do parts 1 and 2 with that computer only. When it is off, AROS waits and catches up once it is back.</p></li>
 
 <li><span class="on other">Other computers</span>
 <h3>Share the folder among them as usual</h3>
@@ -111,7 +111,7 @@
 <dt>"the device closed the connection: accept this device there" or "has it accepted this device?"</dt>
 <dd>The other computer has not accepted the AROS computer yet. Do step 4, or add it by hand as described in the next point.</dd>
 <dt id="no-box">The "New Device" box never appears</dt>
-<dd>Add the AROS computer by hand. On the other computer, click <b>Add Remote Device</b> below the list of devices, type the Device ID shown at the top of Synchr's window, and click <b>Save</b>. Capital or small letters and dashes do not matter there either.</dd>
+<dd>Add the AROS computer by hand. On the other computer, click <b>Add Remote Device</b> below the list of devices, type the Device ID shown at the top of Synchr's window, and click <b>Save</b>. Here too you can use uppercase or lowercase letters and leave out the dashes.</dd>
 <dt>"This is not a Device ID"</dt>
 <dd>A character was mistyped in step 3. Compare it again with the code from step 1; the digits 0, 1 and 8 never occur in a Device ID, so they are read as the letters O, I and B.</dd>
 <dt>"Not shared by the other device yet"</dt>
