@@ -56,8 +56,9 @@ system.
 4. In Syncthing, share a folder with the AROS device. In Synchr, Add
    folder: the same folder ID and the drawer on AROS that should hold it.
 
-The ReadMe in the Synchr drawer goes through the same steps in more
-detail.
+The [step-by-step guide](https://tomaszstaniak.github.io/aros-synchr/setup.html)
+goes through every click on both computers and says what to do when
+something does not connect.
 
 ## Installation
 
