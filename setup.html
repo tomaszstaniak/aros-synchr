@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setting up Synchr, step by step</title>
+<meta name="description" content="How to connect your AROS computer to a computer with Syncthing and share your first folder, one step at a time.">
+<meta name="theme-color" content="#16191c">
+<link rel="stylesheet" href="style.css?v=3">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header wrap"><a href="./" class="brand"><span class="brand-key" aria-hidden="true">S</span>Synchr</a><nav aria-label="Main navigation"><a href="#connect">Connect</a><a href="#folder">Share a folder</a><a href="#trouble">If it does not work</a><a class="nav-get" href="./#get">Get it</a></nav></header>
+
+<main id="main">
+
+<section class="section wrap guide">
+<h1>Setting up Synchr, step by step</h1>
+<p class="intro">It takes about ten minutes. You go back and forth between two machines: your AROS computer and the other computer that runs Syncthing. Each step says which one it is on.</p>
+
+<div class="before">
+<h2>Before you start</h2>
+<ul>
+<li>The network works on AROS: a web page opens, or <code>ping</code> answers.</li>
+<li>Synchr is installed on AROS (<code>apkg install synchr</code>, or unpack the archive from the <a href="./#get">download section</a>).</li>
+<li>Syncthing is installed on the other computer (<a href="https://syncthing.net/downloads/">downloads</a>). On Windows, macOS and Linux, Syncthing is controlled from a page in your web browser. If it is not open, go to <a href="http://127.0.0.1:8384">http://127.0.0.1:8384</a> on that computer. On Android, the Syncthing app has the same steps under similar names.</li>
+</ul>
+</div>
+
+<h2 id="connect">Part 1: connect the two computers</h2>
+<ol class="steps">
+<li><span class="on other">Other computer</span>
+<h3>Show its Device ID</h3>
+<p>On Syncthing's page, open <b>Actions</b> (top right) and choose <b>Show ID</b>. A long code appears, eight groups of seven letters and digits, like <code>MFZWI3D-BONSGYC-YLTMRWG-C43ENR5-QXGZDMM-FZWI3DP-BONSGYY-LTMRWAD</code>. Leave it on the screen.</p></li>
+
+<li><span class="on aros">AROS</span>
+<h3>Start Synchr</h3>
+<p>Double-click Synchr. The first start can take up to a minute: Synchr makes this computer's own Device ID, shown at the top of the window.</p></li>
+
+<li><span class="on aros">AROS</span>
+<h3>Add the other computer</h3>
+<p>Click <b>Add device...</b> and fill in:</p>
+<ul>
+<li><b>Name</b>: one word you choose, for example <code>laptop</code>.</li>
+<li><b>Device ID</b>: the code from step 1. Capital or small letters and the dashes do not matter. If you mistype it, Synchr says "This is not a Device ID": the code has a check built in, so a typo cannot connect you to a wrong computer.</li>
+<li><b>Address</b> and <b>Port</b>: leave them empty. Synchr finds the other computer by its Device ID.</li>
+</ul>
+<p>Click <b>OK</b>. In a virtual machine with a shared clipboard you can copy the ID and paste it instead of typing.</p></li>
+
+<li><span class="on other">Other computer</span>
+<h3>Accept the AROS computer</h3>
+<p>Within a minute or two, Syncthing's page shows a box <b>New Device</b>: the AROS computer, under the name shown in Synchr, wants to connect. Click <b>Add Device</b>, then <b>Save</b>.</p>
+<p>No box after five minutes? See <a href="#no-box">the box never appears</a> below.</p></li>
+
+<li><span class="on aros">AROS</span>
+<h3>Check that they see each other</h3>
+<p>In Synchr's list of devices, the State of the other computer becomes <b>Connected</b>, or <b>Connected through a relay</b> when a router stands between the two. Until a folder is shared it may add "no folder is shared with it by both sides yet". That is expected: go on with part 2.</p></li>
+</ol>
+
+<h2 id="folder">Part 2: share a folder</h2>
+<p class="lead">For the first try, share a new, empty folder. Synchronising works both ways, so a file deleted on one side is also deleted on the other. Once you have seen it work, share the folders you really use.</p>
+<ol class="steps" start="6">
+<li><span class="on other">Other computer</span>
+<h3>Make a folder and share it with AROS</h3>
+<p>Click <b>Add Folder</b> below the list of folders. On the <b>General</b> tab:</p>
+<ul>
+<li><b>Folder Label</b>: any name, for example <code>AROS documents</code>.</li>
+<li><b>Folder ID</b>: Syncthing fills in a random code. Replace it with a short word that is easy to type on AROS, for example <code>aros-docs</code>.</li>
+<li><b>Folder Path</b>: where the folder is kept on this computer.</li>
+</ul>
+<p>On the <b>Sharing</b> tab, tick the AROS computer. Click <b>Save</b>.</p>
+<p class="aside">Sharing a folder you already have? Click it in the list, <b>Edit</b>, tick the AROS computer on the <b>Sharing</b> tab and <b>Save</b>. Its Folder ID cannot be changed: you will type it on AROS as it is shown.</p></li>
+
+<li><span class="on aros">AROS</span>
+<h3>Add the same folder in Synchr</h3>
+<p>Click the other computer once in the list of devices, then click <b>Add folder...</b> and fill in:</p>
+<ul>
+<li><b>Folder ID</b>: exactly the Folder ID from step 6. Here capital and small letters do matter.</li>
+<li><b>Drawer</b>: the drawer on AROS that should hold the files. The button next to the field opens a file requester. A drawer that does not exist yet is made.</li>
+</ul>
+<p>Click <b>OK</b>.</p></li>
+
+<li><span class="on aros">AROS</span>
+<h3>Try it</h3>
+<p>The folder's state goes through "Reading the drawer" and "Synchronising" to <b>Up to date</b>. Copy a file into the drawer on AROS: it shows up on the other computer within about a minute (<b>Read again now</b> makes Synchr look at once). Put a file in the folder on the other computer and it arrives on AROS.</p></li>
+</ol>
+
+<p class="note">Synchronising goes on when you close the window. To have it start with AROS, tick <b>Start with the system</b>. To stop it, choose <b>Stop synchronising and quit</b> in the Project menu.</p>
+
+<h2 id="trouble">If it does not work</h2>
+<p class="lead">Synchr says in the State column what it is waiting for. Find the words there:</p>
+<dl class="trouble">
+<dt>"not found yet; waiting for it to connect"</dt>
+<dd>Check that Syncthing is running on the other computer and that both computers have a network. The first connection can take a few minutes. If "Use Syncthing's public servers" is not ticked, both computers must be on the same local network.</dd>
+<dt>"the device closed the connection: accept this device there" or "has it accepted this device?"</dt>
+<dd>The other computer has not accepted the AROS computer yet. Do step 4, or add it by hand as described in the next point.</dd>
+<dt id="no-box">The "New Device" box never appears</dt>
+<dd>Add the AROS computer by hand. On the other computer, click <b>Add Remote Device</b> below the list of devices, type the Device ID shown at the top of Synchr's window, and click <b>Save</b>. Capital or small letters and dashes do not matter there either.</dd>
+<dt>"This is not a Device ID"</dt>
+<dd>A character was mistyped in step 3. Compare it again with the code from step 1; the digits 0, 1 and 8 never occur in a Device ID, so they are read as the letters O, I and B.</dd>
+<dt>"Not shared by the other device yet"</dt>
+<dd>On the other computer, open the folder's <b>Edit</b> window and check that the AROS computer is ticked on the <b>Sharing</b> tab. Then check that the Folder ID is exactly the same on both sides, capital letters included.</dd>
+<dt>"Cannot be used"</dt>
+<dd>The folder's drawer on AROS is missing or cannot be written to, for example a disk that is not mounted or is write-protected. Use <b>Change folder...</b> to choose another drawer.</dd>
+<dt>"Connected through a relay"</dt>
+<dd>This works. The data goes through one of Syncthing's public relays, encrypted so that the relay cannot read it, and is slower than a direct connection. On the same local network the connection is direct.</dd>
+</dl>
+
+<p class="note">Still stuck? Write through <a href="https://www.patreon.com/reperspective">Patreon</a> or <a href="https://ko-fi.com/enbewu">Ko-fi</a> and say what the State column shows. The file <code>Data/engine.log</code> in the Synchr drawer helps; please never send <code>key.pem</code> or <code>cert.pem</code>, they are your computer's identity.</p>
+</section>
+
+</main>
+
+<footer class="wrap">
+<div><a class="brand" href="./"><span class="brand-key" aria-hidden="true">S</span>Synchr</a><p>Your AROS files on all your computers.</p></div>
+<nav aria-label="Related projects"><a href="https://github.com/tomaszstaniak/aros-synchr">GitHub ↗</a><a href="https://syncthing.net">Syncthing ↗</a><a href="https://github.com/tomaszstaniak/arospkg">apkg ↗</a><a href="https://tomaszstaniak.com">tomaszstaniak.com ↗</a></nav>
+<p class="legal">Synchr is MIT-licensed. Synchr is not made by or affiliated with the Syncthing project.</p>
+</footer>
+</body></html>
