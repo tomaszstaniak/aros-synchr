@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Synchr: keep your AROS files in step with your other computers</title>
+<meta name="description" content="Synchr keeps drawers on your AROS computer the same as folders on your PC, Mac, Linux machine or phone. It works with Syncthing: no cloud, no account, encrypted connections.">
+<meta name="theme-color" content="#16191c"><meta property="og:title" content="Synchr for AROS"><meta property="og:description" content="Your AROS files on all your computers, with Syncthing. No cloud, no account."><meta property="og:type" content="website"><meta property="og:image" content="https://tomaszstaniak.github.io/aros-synchr/assets/window.png">
+<link rel="stylesheet" href="style.css?v=1">
+</head>
+<body>
+<a class="skip" href="#main">Skip to content</a>
+<header class="site-header wrap"><a href="#" class="brand"><span class="brand-key" aria-hidden="true">S</span>Synchr</a><nav aria-label="Main navigation"><a href="#syncthing">Syncthing</a><a href="#why">Why</a><a href="#security">Security</a><a href="#support">Support</a><a href="https://github.com/tomaszstaniak/aros-synchr">Source ↗</a><a class="nav-get" href="#get">Get it</a></nav></header>
+
+<main id="main">
+
+<section class="hero">
+<div class="wrap hero-copy">
+<h1>Your AROS files,<br>on all your computers</h1>
+<p class="intro">Synchr keeps drawers on your AROS computer the same as folders on your PC, Mac, Linux machine or phone. Save a file on AROS and it is on your laptop a moment later. Change it there and the change comes back.</p>
+<p class="fine">For ABIv11 distributions, mainline AROS on PC and the Raspberry Pi. Version 0.2, open source (MIT).</p>
+</div>
+<div class="wrap demo">
+<figure class="stage"><img src="assets/window.png" width="808" height="660" alt="The Synchr window: this computer's name and Device ID, one device called laptop that is connected, and two folders, documents and photos, both up to date"><figcaption>One window for everything: your Device ID at the top, the computers you synchronise with, and the folders you share with them. <span class="where">Synchr 0.2 on AROS x86_64 ABIv11 under QEMU.</span></figcaption></figure>
+</div>
+</section>
+
+<section id="syncthing" class="section wrap">
+<div class="row">
+<div class="row-text">
+<h2>It works with Syncthing</h2>
+<p><a href="https://syncthing.net">Syncthing</a> is a free, open-source program that keeps folders the same on several devices. It runs on Windows, macOS, Linux and Android. The devices talk to each other directly: your files are not stored on anyone's server, and there is no account to create.</p>
+<p>Syncthing itself does not run on AROS. Synchr is a native AROS program that speaks Syncthing's protocol, so to your other devices your AROS computer is simply one more Syncthing device. On the other computers you keep using the ordinary Syncthing; nothing else has to be installed there.</p>
+<p>Each device has a Device ID, a long code that it proves with its own key. You connect two devices by giving each the other's ID, and you choose which folders each one gets.</p>
+</div>
+<div class="row-text">
+<h3>Getting started</h3>
+<p>1. Install Syncthing on your other computer or phone, if it is not there yet.</p>
+<p>2. Start Synchr on AROS. The window shows your AROS computer's Device ID.</p>
+<p>3. Click Add device and paste the other computer's Device ID (in Syncthing: Actions, Show ID). Syncthing asks whether to accept the new device: accept it.</p>
+<p>4. In Syncthing, share a folder with the AROS device. In Synchr, click Add folder and choose the drawer on AROS that should hold it.</p>
+<p>No addresses to type: Synchr finds the other computer by its Device ID.</p>
+</div>
+</div>
+</section>
+
+<section id="why" class="section tinted"><div class="wrap">
+<div class="section-heading"><h2>Why use it</h2><p class="section-lead">Synchr connects AROS to the computers you already use every day.</p></div>
+<div class="cols">
+<article><h3>Work on both sides</h3><p>Write on AROS and keep editing on your laptop, or the other way round. New, changed and deleted files go both ways. If the same file was changed on both sides before they met, nothing is lost: the other version is kept next to it as a conflict copy.</p></article>
+<article><h3>A copy of your AROS work</h3><p>Every drawer you share also lives on another computer and stays up to date as you work. A broken disk or a bad experiment on AROS no longer takes your files with it.</p></article>
+<article><h3>From your phone to AROS</h3><p>Photos, music or notes from a phone that runs Syncthing reach a drawer on AROS without cables, card readers or e-mailing files to yourself.</p></article>
+<article><h3>Works across networks</h3><p>The other computer does not have to be at home. Synchr finds it through Syncthing's public servers, as Syncthing does, and when a router stands in the way the connection goes through a relay.</p></article>
+<article><h3>Runs in the background</h3><p>Close the window and synchronising goes on. Tick "Start with the system" and it starts with AROS, without opening the window.</p></article>
+<article><h3>No cloud, no subscription</h3><p>Nothing to sign up for and nothing to pay for storage. Your files are only on your own devices.</p></article>
+</div>
+</div></section>
+
+<section id="security" class="section wrap">
+<div class="section-heading"><h2>Security and privacy</h2><p class="section-lead">Your files travel only between devices you have added, encrypted the whole way.</p></div>
+<div class="cols">
+<article><h3>Encrypted connections</h3><p>Every connection uses TLS 1.3, the encryption behind secure web pages. Nobody on the network between your devices can read or change what is sent.</p></article>
+<article><h3>Only devices you added</h3><p>Before any file moves, both sides check each other's Device ID against their keys. A device you have not added is refused, so someone who only knows your Device ID still gets nothing.</p></article>
+<article><h3>What the public servers see</h3><p>Syncthing's discovery servers learn your Device ID and the address where your computer can be reached, so that your devices can find each other. Your files never pass through them.</p></article>
+<article><h3>Relays cannot read your files</h3><p>When a relay is needed, it passes on data that is already encrypted between your two devices. It cannot see file names or contents.</p></article>
+<article><h3>Local only, if you prefer</h3><p>Untick "Use Syncthing's public servers" and Synchr uses only your local network and addresses you type. No public server is contacted at all.</p></article>
+<article><h3>Your key stays with you</h3><p>The files <code>key.pem</code> and <code>cert.pem</code> in the drawer Data are your computer's identity. Keep them, and do not send them to anyone; the rest of the Data drawer is settings and a log.</p></article>
+</div>
+<p class="note">Good to know: deleting a file in a shared folder deletes it on the other devices too, so try Synchr with a test folder first. Files are stored on AROS as they are, without encryption on the disk. Synchr is open source, so anyone can check how it works.</p>
+</section>
+
+<section id="get" class="section tinted"><div class="wrap get">
+<div class="section-heading"><h2>Downloads</h2><p class="section-lead">Version 0.2 is the current release. With <a href="https://github.com/tomaszstaniak/arospkg">apkg</a>, one command installs it:</p></div>
+<pre class="install"><code>apkg install synchr</code></pre>
+<div class="downloads">
+<a class="dl" href="https://github.com/tomaszstaniak/aros-synchr/releases/download/v0.2/Synchr-0.2-r1-aros-x86_64-abiv11-pc.zip"><strong>ABIv11 distributions</strong><span>x86_64, PC</span></a>
+<a class="dl" href="https://github.com/tomaszstaniak/aros-synchr/releases/download/v0.2/Synchr-0.2-r1-aros-x86_64-abiv1-pc.zip"><strong>Mainline AROS</strong><span>x86_64, ABIv1, a nightly from 2026-11-06 or later</span></a>
+<a class="dl" href="https://github.com/tomaszstaniak/aros-synchr/releases/download/v0.2/Synchr-0.2-r1-aros-aarch64-abiv1-raspi.zip"><strong>Raspberry Pi</strong><span>AArch64, ABIv1, tested under QEMU only</span></a>
+</div>
+<div class="cols">
+<article><h3>Starting it</h3><p>Unpack the archive anywhere and double-click Synchr. The ReadMe in the drawer walks through connecting the first device. On the other side you need <a href="https://syncthing.net/downloads/">Syncthing</a>.</p></article>
+<article><h3>What it needs</h3><p>A working network connection on AROS. Choose the archive for your architecture and ABI; they are not interchangeable.</p></article>
+<article><h3>Not there yet</h3><p>A folder is kept in step with one other device for now. IPv6 and automatic port opening on routers are not supported yet, so connections between different networks go through a relay. Under QEMU, use the rtl8139 network card: with e1000 the system can stop during transfers.</p></article>
+</div>
+</div></section>
+
+<section id="support" class="section wrap">
+<div class="solo">
+<h2>Support and feedback</h2>
+<p>Synchr is an independent project. If it is useful to you, you can support further work, and tell me what works, what does not and what you would like next. Both places take messages as well as support.</p>
+<div class="support-links"><a href="https://www.patreon.com/reperspective">Patreon</a><a href="https://ko-fi.com/enbewu">Ko-fi</a></div>
+</div>
+</section>
+
+<section id="more" class="section tinted"><div class="wrap">
+<div class="section-heading"><h2>More programs for AROS</h2><p class="section-lead">Synchr is one of a family of programs for AROS from the same author. Most of them install with apkg.</p></div>
+<div class="more">
+<a href="https://tomaszstaniak.github.io/aros-launcher/"><strong>Jumpstart</strong><span>A keyboard launcher: programs, files, windows, sums and currencies from one hotkey.</span></a>
+<a href="https://tomaszstaniak.github.io/aros-dockbar/"><strong>Dockbar</strong><span>An Amiga-style dock with launchers, groups, clocks and weather.</span></a>
+<a href="https://tomaszstaniak.github.io/limpet/"><strong>Limpet</strong><span>A terminal with Unicode, true colour, searchable scrollback and SSH.</span></a>
+<a href="https://tomaszstaniak.github.io/arca/"><strong>Arca</strong><span>An archive manager: pack, browse and extract archives.</span></a>
+<a href="https://github.com/tomaszstaniak/aros-foliopdf"><strong>Folio</strong><span>A PDF reader built on MuPDF.</span></a>
+<a href="https://github.com/tomaszstaniak/aros-capture"><strong>Capture</strong><span>Screenshots with area capture and a markup editor.</span></a>
+<a href="https://github.com/tomaszstaniak/aros-wordcraft"><strong>WordCraft</strong><span>A word processor.</span></a>
+<a href="https://github.com/tomaszstaniak/aros-gridcraft"><strong>GridCraft</strong><span>Spreadsheets.</span></a>
+<a href="https://github.com/tomaszstaniak/aros-deckcraft"><strong>DeckCraft</strong><span>Presentations and slide shows.</span></a>
+<a href="https://github.com/tomaszstaniak/aros-cadcraft"><strong>CADCraft</strong><span>2D CAD drafting.</span></a>
+<a href="https://github.com/tomaszstaniak/aros-libresprite"><strong>LibreSprite</strong><span>A pixel art and animation editor.</span></a>
+<a href="https://github.com/tomaszstaniak/aros-pragtical"><strong>Pragtical</strong><span>A lightweight code editor.</span></a>
+<a href="https://github.com/tomaszstaniak/arospkg"><strong>apkg</strong><span>The package manager that installs all of the above.</span></a>
+</div>
+</div></section>
+
+</main>
+
+<footer class="wrap">
+<div><a class="brand" href="#"><span class="brand-key" aria-hidden="true">S</span>Synchr</a><p>Your AROS files on all your computers.</p></div>
+<nav aria-label="Related projects"><a href="https://github.com/tomaszstaniak/aros-synchr">GitHub ↗</a><a href="https://syncthing.net">Syncthing ↗</a><a href="https://github.com/tomaszstaniak/arospkg">apkg ↗</a><a href="https://tomaszstaniak.com">tomaszstaniak.com ↗</a></nav>
+<p class="legal">Synchr is MIT-licensed; it includes OpenSSL (Apache License 2.0) and jitterentropy (BSD), and one part derived from Syncthing is under the Mozilla Public License 2.0. Synchr is not made by or affiliated with the Syncthing project. The screenshot was taken under QEMU.</p>
+</footer>
+</body></html>
