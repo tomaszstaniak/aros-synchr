@@ -5,11 +5,11 @@
 <title>Setting up Synchr, step by step</title>
 <meta name="description" content="How to connect your AROS computer to a computer with Syncthing and share your first folder, one step at a time.">
 <meta name="theme-color" content="#16191c">
-<link rel="stylesheet" href="style.css?v=3">
+<link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
 <a class="skip" href="#main">Skip to content</a>
-<header class="site-header wrap"><a href="./" class="brand"><span class="brand-key" aria-hidden="true">S</span>Synchr</a><nav aria-label="Main navigation"><a href="#connect">Connect</a><a href="#folder">Share a folder</a><a href="#trouble">If it does not work</a><a class="nav-get" href="./#get">Get it</a></nav></header>
+<header class="site-header wrap"><a href="./" class="brand"><span class="brand-key" aria-hidden="true">S</span>Synchr</a><nav aria-label="Main navigation"><a href="#connect">Connect</a><a href="#folder">Share a folder</a><a href="#more-computers">Other computers</a><a href="#trouble">If it does not work</a><a class="nav-get" href="./#get">Get it</a></nav></header>
 
 <main id="main">
 
@@ -85,6 +85,23 @@
 </ol>
 
 <p class="note">Synchronising goes on when you close the window. To have it start with AROS, tick <b>Start with the system</b>. To stop it, choose <b>Stop synchronising and quit</b> in the Project menu.</p>
+
+<h2 id="more-computers">Part 3: your other computers</h2>
+<p class="lead">You may have Syncthing on several computers, say a laptop, a desktop and a phone. In Synchr each folder is kept in step with one of them. The others get the files through that one, the usual Syncthing way.</p>
+<ol class="steps" start="9">
+<li><span class="on other">Other computer</span>
+<h3>Pick one computer for AROS</h3>
+<p>Choose the one that is switched on most often, and do parts 1 and 2 with it only. When it is off, AROS waits and catches up as soon as it is back.</p></li>
+
+<li><span class="on other">Other computers</span>
+<h3>Share the folder among them as usual</h3>
+<p>On the computer you picked, open the folder's <b>Edit</b> window and tick your other computers on the <b>Sharing</b> tab, then <b>Save</b>. Each of them asks to add the folder: accept it there. If the folder was already shared among them before, there is nothing to do.</p>
+<p>On those other computers, leave the AROS computer unticked. They do not need to know it: what changes on AROS reaches them through the computer you picked, and their changes reach AROS the same way.</p></li>
+
+<li><span class="on aros">AROS</span>
+<h3>Different folders from different computers</h3>
+<p>A folder can come from another computer than the first one, for example documents from the laptop and music from the desktop. Add that computer in Synchr too (part 1 again), click it in the list of devices, and add its folder with <b>Add folder...</b> (part 2). Each folder stays with the device it was added under.</p></li>
+</ol>
 
 <h2 id="trouble">If it does not work</h2>
 <p class="lead">Synchr says in the State column what it is waiting for. Find the words there:</p>

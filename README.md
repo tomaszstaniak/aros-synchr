@@ -85,7 +85,9 @@ connection on AROS.
 
 - Try it with a test folder first. Synchronising works both ways:
   deleting a file on one side deletes it on the other.
-- A folder is kept in step with one other device for now.
+- A folder is kept in step with one other device for now. Your other
+  computers get it through that one, as described in the
+  [guide](https://tomaszstaniak.github.io/aros-synchr/setup.html#more-computers).
 - IPv6 and automatic port opening on routers (UPnP) are not supported
   yet. Without them, connections between different networks go through a
   relay, which works but is slower.
