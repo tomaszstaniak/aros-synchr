@@ -161,6 +161,7 @@ footer nav a:hover{color:var(--ink)}
 .before ul{margin:0}
 .steps{list-style:none;counter-reset:step;padding:0;margin:0}
 .steps[start="6"]{counter-reset:step 5}
+.steps[start="9"]{counter-reset:step 8}
 .steps > li{counter-increment:step;position:relative;padding:0 0 30px 46px;margin:0 0 0 18px;border-left:1px solid var(--line)}
 .steps > li:last-child{border-left-color:transparent}
 .steps > li::before{content:counter(step);position:absolute;left:-18px;top:0;width:36px;height:36px;border-radius:50%;background:var(--ground);border:1px solid var(--accent);color:var(--accent);display:grid;place-items:center;font-weight:600}
