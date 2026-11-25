@@ -14,9 +14,9 @@ R=$ST_ROOT
 version=$(sed -n 's/^#define GUI_VERSION "\([0-9.]*\)"/\1/p' "$R/gui/stgui.c")
 [ -n "$version" ] || { echo "No version in gui/stgui.c" >&2; exit 1; }
 case "$ST_TARGET" in
-  x86_64-aros-v1) arch=aros-x86_64-abiv1-pc; requires="AROS x86_64 ABIv1 (mainline), a nightly from 2026-11-06 or later." ;;
+  x86_64-aros-v1) arch=aros-x86_64-abiv1-pc; requires="AROS x86_64 ABIv1 (mainline), a nightly from 2026-11-24 or later. On earlier nightlies use Synchr 0.2 revision 1." ;;
   x86_64-aros-v11) arch=aros-x86_64-abiv11-pc; requires="AROS x86_64 ABIv11 (an ABIv11 distribution)." ;;
-  aarch64-aros-v1) arch=aros-aarch64-abiv1-raspi; requires="AROS Raspberry Pi AArch64 ABIv1 (mainline)." ;;
+  aarch64-aros-v1) arch=aros-aarch64-abiv1-raspi; requires="AROS Raspberry Pi AArch64 ABIv1 (mainline), a nightly from 2026-11-24 or later. On earlier nightlies use Synchr 0.2 revision 1." ;;
   *) echo "unknown target $ST_TARGET" >&2; exit 2 ;;
 esac
 b=$R/build/$ST_TARGET
